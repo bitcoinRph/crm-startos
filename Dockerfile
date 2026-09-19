@@ -21,8 +21,13 @@ ENV NODE_ENV=production \
 RUN bun install --frozen-lockfile \
     && bun run build \
     && rm -rf node_modules/.cache apps/app/.next/cache \
-    && rm -rf node_modules/.bun/@next+swc-linux-*-musl@* \
-              node_modules/.bun/@biomejs+cli-linux-* \
-              node_modules/.bun/@turbo+linux-*
+    && echo "image-size before: $(du -shc /app /root/.bun/install/cache | tail -1 | cut -f1)" \
+    && find . -type d \( \
+         -path '*@next*swc-linux-*-musl*' -o \
+         -path '*@biomejs*cli-linux-*' -o \
+         -path '*@turbo*linux-*' \) \
+       -prune -print -exec rm -rf {} + \
+    && rm -rf /root/.bun/install/cache \
+    && echo "image-size after: $(du -sh /app | cut -f1)"
 
 EXPOSE 3000 3001 2000
