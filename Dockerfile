@@ -20,6 +20,9 @@ ENV NODE_ENV=production \
 
 RUN bun install --frozen-lockfile \
     && bun run build \
-    && rm -rf node_modules/.cache apps/app/.next/cache
+    && rm -rf node_modules/.cache apps/app/.next/cache \
+    && rm -rf node_modules/.bun/@next+swc-linux-*-musl@* \
+              node_modules/.bun/@biomejs+cli-linux-* \
+              node_modules/.bun/@turbo+linux-*
 
 EXPOSE 3000 3001 2000
