@@ -76,3 +76,5 @@ The agent gets tools to search the CRM, read and update companies, contacts and 
 
 - The research agent's model runs at the Vercel AI Gateway, not on your server. Email text the agent reads leaves your server when it researches. Leave the key out if that is not acceptable.
 - The agent's own shell runs in a pure-JavaScript sandbox with no real binaries, because StartOS has no Docker for it. Its research still works; scripts it writes for itself may not.
+- The research agent reads web pages you did not choose. A page can carry text written to give the agent new instructions, and the agent can act on it with your CRM data. Give the agent a key only if you accept that.
+- Sign-in tokens for Google and Microsoft, and any third-party keys you enter, are stored as plain text in the service's database. Your backups carry them too. Keep both private.
