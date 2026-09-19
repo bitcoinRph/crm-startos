@@ -175,3 +175,20 @@ A rebuild drops the database and re-runs every migration, and it says which of t
 two reasons fired. Force one with `bun run db:test --reset`. Nothing else in the
 repo may drop a database, and this may only because the `_test` suffix is checked
 first.
+
+## The Docker image
+
+The root `Dockerfile` builds one image that runs the three processes: the
+Next.js app on 3000, the NestJS API on 3001 and the eve research agent on
+2000. Postgres is not in the image; point `DATABASE_URL` at one. The
+`deploy/startos/` package drives this image on StartOS, and a compose file
+can drive it the same way with one container per process.
+
+The build stage sets placeholder values for `DATABASE_URL` and `API_URL`.
+`prisma.config.ts` refuses to load without a database URL, and `next build`
+inlines `NEXT_PUBLIC_API_URL` from `API_URL`. Neither value is used at
+runtime: the process manager supplies the real ones, and the app reads the
+API through `API_INTERNAL_URL` on the server side.
+
+`eve build` needs network access to the Vercel AI Gateway to compile the
+agent, so the image build fails offline.

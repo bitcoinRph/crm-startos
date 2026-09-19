@@ -56,6 +56,8 @@ const appUrls = (optional("APP_URL") ?? DEFAULT_APP_URL)
 
 const appUrl = appUrls[0] ?? DEFAULT_APP_URL;
 
+const passwordSignIn = process.env.PASSWORD_SIGN_IN === "true";
+
 export const env = {
 	apiUrl,
 	appUrl,
@@ -65,6 +67,7 @@ export const env = {
 	cookieDomain: optional("AUTH_COOKIE_DOMAIN"),
 	trustedOrigins: [...new Set([...appUrls, apiUrl])],
 	isProduction: process.env.NODE_ENV === "production",
+	passwordSignIn,
 } as const;
 
 export function isGoogleConfigured(): boolean {
@@ -77,6 +80,10 @@ export function isMicrosoftConfigured(): boolean {
 
 export function isSlackConfigured(): boolean {
 	return env.slack !== undefined;
+}
+
+export function isPasswordSignInConfigured(): boolean {
+	return env.passwordSignIn;
 }
 
 export { apiUrl, appUrl };

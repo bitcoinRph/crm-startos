@@ -15,6 +15,7 @@ import {
 } from "trpc-to-openapi";
 import { AppModule } from "./app.module";
 import { ContextLogger } from "./logging/context-logger";
+import { createMcpBridge, MCP_PATH, type McpBridge } from "./mcp/mcp-bridge";
 import { REST_BRIDGE_PATH } from "./trpc/openapi";
 import { createBaseTrpcContext } from "./trpc/trpc.context";
 
@@ -46,6 +47,15 @@ export async function createApp(): Promise<NestExpressApplication> {
 			void restBridge(req, res);
 		},
 	);
+
+	let mcpBridge: McpBridge | undefined;
+	app.use(MCP_PATH, (req: Request, res: Response, next: NextFunction) => {
+		if (!mcpBridge) {
+			next();
+			return;
+		}
+		void mcpBridge(req, res);
+	});
 
 	const apiKeySecurityScheme = {
 		type: "apiKey",
@@ -111,6 +121,8 @@ export async function createApp(): Promise<NestExpressApplication> {
 		router: appRouter,
 		createContext: ({ req }) => createBaseTrpcContext(req),
 	});
+
+	mcpBridge = createMcpBridge(appRouter);
 
 	return app;
 }

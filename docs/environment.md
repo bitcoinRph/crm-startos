@@ -46,6 +46,13 @@ Microsoft equivalent of `hd`**: `tenantId` is the whole of it.
 **Neither pair is required, but an install wants one of them or an SSO provider** —
 with none, the sign-in page says so by name rather than rendering nothing.
 
+**`PASSWORD_SIGN_IN="true"`** adds a password form for installs no identity
+provider can reach — a server on a private network, where Google refuses the
+redirect. Sign-up stays closed: `bun run --filter=api local-account` creates or
+resets an account from `LOCAL_ACCOUNT_EMAIL` and `LOCAL_ACCOUNT_PASSWORD`, and
+still refuses an address that `ALLOWED_SIGN_IN` does not admit. It is off unless
+the value is exactly `true`.
+
 **`ALLOWED_SIGN_IN`** — comma-separated whole domains or single addresses (bare
 addresses exist for a solo self-hoster, where `gmail.com` would be an open door). **One
 list, read by the sign-in guard *and* the sync's "which side is external" decision** —
@@ -67,6 +74,9 @@ list fails closed.** Parsed on demand. `packages/auth/src/workspace.ts`.
   Running the API from the repo root fixes the watch and breaks Nest, which
   resolves its tsconfig paths from the current directory and then cannot build
   its dependency graph. There is no fix in the dev script today.
+- **`API_INTERNAL_URL`** is where the app's server side fetches the API when
+  that differs from `API_URL` — a container's loopback, a compose service name.
+  The browser never sees it; unset, the server side uses `API_URL`.
 - **`APP_URL`** (`:3000`) is also the trusted-origin and `callbackURL` allow-list.
 - **Every OAuth `redirect_uri` is built from `API_URL`, never `APP_URL`.** Better
   Auth serves `/api/auth/*` at `baseURL`, and `baseURL` is `apiUrl`. A redirect
