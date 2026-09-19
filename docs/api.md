@@ -163,6 +163,32 @@ Two rules follow for the serverless build:
   `MODULE_NOT_FOUND` on the first request. Adding a name to `EXTERNALS` without
   checking it lands in `.vercel/output` breaks production, and the build stays green.
 
+## The MCP endpoint is built at runtime from tRPC, like the OpenAPI document
+
+`POST /api/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server in `src/mcp/`. It exists so an outside agent — Claude Code, Codex,
+Hermes — can read and write the CRM through the same procedures, validation and
+middlewares as the app. It is a wire format, not a second data surface.
+
+- **Every tool is a tRPC procedure.** `mcp-tools.ts` is the allow-list: a tool
+  name, the procedure path and a description written for a model. Its input
+  schema is the procedure's own zod input, converted with `z.toJSONSchema`, so
+  a contract change reaches the tools without a second copy.
+- **Nothing here decides anything.** A tool call is `callProcedure` with the
+  request's context, so `AuthMiddleware` and the services run exactly as they
+  do for the browser. Rule one holds: the agent that calls the tools is the one
+  doing the thinking.
+- **An API key is the credential.** The bridge resolves the session the way
+  `createBaseTrpcContext` does, and additionally accepts the key as
+  `Authorization: Bearer crm_…` because some MCP clients can only send that
+  header. No key, no session, `401` — before any JSON-RPC is parsed.
+- **Stateless, JSON responses.** One `Server` per request, no session ids, no
+  SSE, so the endpoint works through the app's `/api/*` proxy and through
+  reverse proxies that buffer.
+- **Not every procedure belongs in the list.** Bulk operations, purges, API-key
+  management, SSO and tracking settings stay out. Adding a tool is one entry in
+  `mcp-tools.ts`; adding a destructive one is a review question.
+
 ## Two mail providers, one pipeline
 
 `apps/api/src/mailbox` is everything neither Google nor Microsoft owns:

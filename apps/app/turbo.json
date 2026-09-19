@@ -10,6 +10,7 @@
 			"passThroughEnv": [
 				"AGENT_BRIDGE_SECRET",
 				"AGENT_URL",
+				"API_INTERNAL_URL",
 				"AUTH_COOKIE_DOMAIN",
 				"AUTH_TRUSTED_ORIGINS",
 				"BETTER_AUTH_SECRET",
@@ -33,6 +34,7 @@
 			"passThroughEnv": [
 				"AGENT_BRIDGE_SECRET",
 				"AGENT_URL",
+				"API_INTERNAL_URL",
 				"AUTH_COOKIE_DOMAIN",
 				"AUTH_TRUSTED_ORIGINS",
 				"BETTER_AUTH_SECRET",

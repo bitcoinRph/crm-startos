@@ -1,0 +1,63 @@
+export const DEFAULT_LANG = 'en_US'
+
+const dict = {
+  'Vercel AI Gateway key': 0,
+  'The research agent reaches its model through the Vercel AI Gateway. Without a key the CRM works, but research sessions fail.': 1,
+  'Perplexity API key': 2,
+  'Lets the agent search the open web with citations. Queries send a name, an email domain and an employer to Perplexity.': 3,
+  'GitHub token': 4,
+  'Raises the rate limit when matching contacts to GitHub profiles. Any classic token with no scopes.': 5,
+  'Vercel Blob token': 6,
+  'Where logos and profile pictures are stored. Without it, contacts have no photograph and logos are hotlinked.': 7,
+  'Anonymous usage telemetry': 8,
+  'Send one daily event of counts to the upstream project. Off by default on StartOS.': 9,
+  'Configure Research Agent': 10,
+  'API keys the research agent uses. Every key is optional; each one adds a place it can look.': 11,
+  'Who may sign in': 12,
+  'Comma-separated email domains or single addresses, for example "acme.com" or "you@gmail.com". The credentials email is always allowed.': 13,
+  'Public URL': 14,
+  'The address Google or Microsoft redirect to after sign-in. Leave empty to use the first address of the Web UI interface. Google refuses .local addresses, so set a real domain here for Google sign-in.': 15,
+  'Must be an origin like https://crm.example.com': 16,
+  'Google client ID': 17,
+  'A Google OAuth web client. Enables Google sign-in and Gmail and Calendar sync. Set both Google values or neither.': 18,
+  'Google client secret': 19,
+  'Microsoft client ID': 20,
+  'A Microsoft Entra app registration. Enables Microsoft sign-in and Outlook sync. Set both Microsoft values or neither.': 21,
+  'Microsoft client secret': 22,
+  'Microsoft tenant': 23,
+  'Leave empty for "common". Set your tenant GUID to refuse every other tenant at Microsoft.': 24,
+  'Configure Sign-in': 25,
+  'The sign-in allow-list, the public URL and the optional Google and Microsoft sign-in providers.': 26,
+  Email: 27,
+  'The address you will sign in with. It is added to the sign-in allow-list automatically.': 28,
+  'Must be an email address': 29,
+  Password: 30,
+  'Leave empty to generate one.': 31,
+  'Set Sign-in Credentials': 32,
+  'Create or reset the account you sign in with. The first account to sign in becomes the workspace owner.': 33,
+  'Sign-in Credentials': 34,
+  'Use these on the sign-in page. The password is applied the next time the CRM starts.': 35,
+  'Create the first account before the CRM starts': 36,
+  'Web UI': 37,
+  'The CRM web interface': 38,
+  MCP: 39,
+  'Model Context Protocol endpoint for AI agents. Authenticate with a CRM API key from Settings.': 40,
+  'PostgreSQL is ready': 41,
+  'Waiting for PostgreSQL': 42,
+  API: 43,
+  'The API is ready': 44,
+  'The API is not ready': 45,
+  'Web Interface': 46,
+  'The web interface is ready': 47,
+  'The web interface is not ready': 48,
+  'Research Agent': 49,
+  'The research agent is ready': 50,
+  'The research agent is not ready': 51,
+} as const
+
+/**
+ * Plumbing. DO NOT EDIT.
+ */
+export type I18nKey = keyof typeof dict
+export type LangDict = Record<(typeof dict)[I18nKey], string>
+export default dict

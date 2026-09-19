@@ -16,7 +16,8 @@
 		"apps/api/src/generated/**",
 		"packages/db/src/generated/**",
 		"packages/ui/src/components/**",
-		"tools/oxlint/anti-slop/**"
+		"tools/oxlint/anti-slop/**",
+		"deploy/**"
 	],
 	"rules": {
 		"anti-slop/no-chained-type-assertions": "error",
