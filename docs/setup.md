@@ -195,14 +195,30 @@ agent, so the image build fails offline.
 
 ### What the build deletes, and what it must keep
 
-The build drops three things from `node_modules/.bun` after `bun run build`,
-which removes about 380 MB:
+After `bun run build` the image drops three packages it can never run, and
+bun's global install cache:
 
 | Removed | Why it is safe |
 | --- | --- |
 | `@next/swc-linux-*-musl` | The image is Debian, so glibc. The musl binaries never load. |
 | `@biomejs/cli-linux-*` | Biome only lints. Nothing runs it at runtime. |
 | `@turbo/linux-*` | Turborepo only orchestrates the build. Each process starts through its own package script. |
+| `/root/.bun/install/cache` | The download cache. Nothing reads it once `node_modules` exists. |
+
+**Delete the packages without the cache and you save nothing.** `bun install`
+hardlinks package files out of its cache into `node_modules`, so every large
+file carries two links. Removing one path leaves the bytes alive on the other,
+and the image does not shrink by a single megabyte. Measured on this
+repository: `node_modules` is 2551 MiB, the cache is 2547 MiB, and their
+deduplicated union is 2630 MiB, so only 79 MiB of the cache is its own. The
+two removals only pay off together.
+
+That is also why the step prints the size before and after. Two earlier
+attempts at this cleanup reported success and changed the `.s9pk` by under
+6 KB, once because the glob matched nothing and once because of the
+hardlinks. Compare the printed sizes, and compare the published `.s9pk`
+against the previous release, rather than trusting that a green build means
+the cleanup worked.
 
 **Do not extend this to a blanket `--production` install.** Four packages that
 the service needs at runtime are declared as `devDependencies`: `pg` and
