@@ -16,6 +16,7 @@
 
 ## Table of Contents
 
+- [Downloading and Building the `.s9pk`](#downloading-and-building-the-s9pk)
 - [Image and Container Runtime](#image-and-container-runtime)
 - [Volume and Data Layout](#volume-and-data-layout)
 - [Installation and First-Run Flow](#installation-and-first-run-flow)
@@ -29,6 +30,31 @@
 - [What Is Unchanged from Upstream](#what-is-unchanged-from-upstream)
 - [Contributing](#contributing)
 - [Quick Reference for AI Consumers](#quick-reference-for-ai-consumers)
+
+---
+
+## Downloading and Building the `.s9pk`
+
+Built packages are published on the repository's [Releases](https://github.com/bitcoinRph/crm-startos/releases) page, one release per package version, tagged `startos-v<version>` with the colon written as a hyphen. Each release carries both architectures and a `checksums.txt`:
+
+| File | Server |
+| --- | --- |
+| `crm_<version>_x86_64.s9pk` | Intel, AMD, and any x86 machine |
+| `crm_<version>_aarch64.s9pk` | Raspberry Pi, Start9 Server Pure and Server One, and any ARM machine |
+
+Download one, open your StartOS device in a browser, then click **Sideload** in the top navigation bar and select it.
+
+`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**, then publishes them. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
+
+The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one, so **raise that version before merging whenever an existing install has to update**. A merge that leaves it alone replaces the files on the existing release instead of publishing a new one, which is what a fresh install wants and what an update cannot use.
+
+To build locally instead, install [Docker](https://docs.docker.com/engine/install/), Node.js 22 or newer and [`start-cli`](https://start9.com/start-cli/install.sh), create a packaging workspace once in the directory that holds the clone, then build from this directory:
+
+```sh
+start-cli s9pk init-workspace .
+npm ci
+make x86
+```
 
 ---
 

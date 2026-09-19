@@ -18,3 +18,5 @@ The PostgreSQL sidecar is pinned by `images.postgres.source.dockerTag` in `start
 2. Set `version` in `startos/versions/current.ts` to `<root package.json version>:0` and write the release notes from upstream's `CHANGELOG.md`.
 3. For a wrapper-only change, keep the upstream part and increment the number after the colon.
 4. Bump the PostgreSQL tag only within major version 17; a major upgrade needs a data migration.
+
+Raise that `version` in the same change that reaches `release`. The `StartOS package` workflow names its GitHub Release after it, and StartOS refuses to install a package whose version is not higher than the installed one, so a merge that leaves the version alone produces files no existing install can take.

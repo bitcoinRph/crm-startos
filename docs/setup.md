@@ -192,3 +192,24 @@ API through `API_INTERNAL_URL` on the server side.
 
 `eve build` needs network access to the Vercel AI Gateway to compile the
 agent, so the image build fails offline.
+
+### What the build deletes, and what it must keep
+
+The build drops three things from `node_modules/.bun` after `bun run build`,
+which removes about 380 MB:
+
+| Removed | Why it is safe |
+| --- | --- |
+| `@next/swc-linux-*-musl` | The image is Debian, so glibc. The musl binaries never load. |
+| `@biomejs/cli-linux-*` | Biome only lints. Nothing runs it at runtime. |
+| `@turbo/linux-*` | Turborepo only orchestrates the build. Each process starts through its own package script. |
+
+**Do not extend this to a blanket `--production` install.** Four packages that
+the service needs at runtime are declared as `devDependencies`: `pg` and
+`prisma` in `packages/db`, and `just-bash` and `microsandbox` in `apps/agent`.
+Pruning them breaks the service.
+
+`@prisma/studio-core` is the sharpest edge. The Prisma 7 CLI requires it
+unconditionally, so removing it makes `prisma migrate deploy` exit with
+`Cannot find module '@prisma/studio-core/data/bff'`. That command runs on
+every start, so the service would never come up.
