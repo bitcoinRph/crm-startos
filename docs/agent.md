@@ -707,6 +707,18 @@ switch it on:
 Stop the local agent before you run an e2e script against a dev database. A
 running agent leases the rows the script seeds and retires exhausted tasks the
 script did not create.
+
+**One known intermittent failure is unexplained.** `retireExhausted > retires no
+more rows than the limit allows` in `tasks.integration.spec.ts` has twice
+reported `retireExhausted(2)` returning 3 rows, once locally and once in CI,
+on a strictly sequential run. It did not reproduce in 12 solo runs, 5 full-suite
+runs, 1,200 iterations of the same `UPDATE` in plpgsql across four query
+shapes, or a two-session probe that held a row lock while the statement ran
+with a forced nested-loop plan. The statement honours `LIMIT` in every plan
+PostgreSQL produced. Nothing was changed on that evidence. If it recurs, capture
+`EXPLAIN (ANALYZE)` of the exact parameterised statement from inside the
+failing process before touching `retireExhausted`.
+
 **`taskFromToken` keys on the `task:` marker, not a fixed prefix**
 (`test/crm-token.spec.ts`). **A channel handler must not assume the token it receives
 is byte-identical to the one it sent.**

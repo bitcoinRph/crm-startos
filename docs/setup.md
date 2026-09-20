@@ -220,10 +220,23 @@ hardlinks. Compare the printed sizes, and compare the published `.s9pk`
 against the previous release, rather than trusting that a green build means
 the cleanup worked.
 
-**Do not extend this to a blanket `--production` install.** Four packages that
-the service needs at runtime are declared as `devDependencies`: `pg` and
-`prisma` in `packages/db`, and `just-bash` and `microsandbox` in `apps/agent`.
-Pruning them breaks the service.
+**Three runtime packages used to be declared as `devDependencies`, and are
+now declared where they belong.** `@prisma/adapter-pg` needs `pg` at runtime,
+`main.ts` runs `prisma migrate deploy` on every start, and eve's sandbox falls
+through to `just-bash` inside the container. All three sit in `dependencies`
+now, so a `--production` install no longer removes them.
+
+`microsandbox` stays a `devDependency` on purpose. eve's `defaultBackend()`
+checks host support before it ever imports the package, and a container
+without `/dev/kvm` fails that check, so the package is never loaded there. It
+exists for a developer machine with KVM or Apple Silicon.
+
+**A `--production` install is still not proven safe.** The API, the web app and
+both startup oneshots were exercised against a tree without the build-only
+packages, but the agent cannot be built in the sandbox this was verified in,
+so its runtime imports have not been checked the same way. Treat the
+`dependencies` lists as accurate for the API and the app, and as a best
+reading of the code for the agent.
 
 `@prisma/studio-core` is the sharpest edge. The Prisma 7 CLI requires it
 unconditionally, so removing it makes `prisma migrate deploy` exit with
