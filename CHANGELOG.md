@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.17.0](https://github.com/bitcoinRph/crm-startos/compare/v1.16.0...v1.17.0) (2026-09-22)
+
+
+### Features
+
+* **api:** give every API key a profile and enforce it on each call ([356cbae](https://github.com/bitcoinRph/crm-startos/commit/356cbae740e6dbad760ec1bf8ffee8a28dac316c))
+* **api:** record which key requested and proposed every sales change, name the producer, and close a request over MCP ([108c366](https://github.com/bitcoinRph/crm-startos/commit/108c366a021c69bddd83b7ef4e555ef28f89d9fb))
+* **app:** choose a key's access when creating it and show it in the table ([e4c2e2b](https://github.com/bitcoinRph/crm-startos/commit/e4c2e2bf7b97116a358acea06838859a15a92ea6))
+* **app:** put sales proposals in the navigation with shared components, and retire the research gate route ([2a1e73f](https://github.com/bitcoinRph/crm-startos/commit/2a1e73fd34cbefb879a6930b7cdfd941f72aec88))
+* **crm:** add local-first inference and sales proposal review ([e4651d8](https://github.com/bitcoinRph/crm-startos/commit/e4651d815f83f97cfdb6b1d4703d6e3fdcd4ae3d))
+* **startos:** declare Ollama as the local inference dependency and resolve its bridge address ([e389f40](https://github.com/bitcoinRph/crm-startos/commit/e389f402b4e11e70e1efb5da9efab2575dcb99d8))
+
+
+### Fixes
+
+* **startos:** back up the PostgreSQL data directory at its real path ([c99be2c](https://github.com/bitcoinRph/crm-startos/commit/c99be2c2021a45060e79428bb6de82001d26597c))
+
+
+### Refactors
+
+* **agent:** one inference config with a verified Ollama version list, and local mode denies the chat ([4a5e4e2](https://github.com/bitcoinRph/crm-startos/commit/4a5e4e2e784711cedc20f8e15c2edcb1e6f253e7))
+* **api:** keep the permission schema private to the profiles module ([a812eea](https://github.com/bitcoinRph/crm-startos/commit/a812eea030822880328d1785a184ee8cd5d04385))
+
+
+### Documentation
+
+* **crm:** add the review of PR [#8](https://github.com/bitcoinRph/crm-startos/issues/8) with findings and change plan ([19b343e](https://github.com/bitcoinRph/crm-startos/commit/19b343e8055fc0bc3e576f553ea4559b10b614e2))
+* **crm:** agent integration guide, StartOS smoke script and a mocked-Ollama extraction test ([6cbd673](https://github.com/bitcoinRph/crm-startos/commit/6cbd6731f636f428b46f4db25287d9ef6ab09db9))
+
 ## [1.16.0](https://github.com/bitcoinRph/crm-startos/compare/v1.15.3...v1.16.0) (2026-09-20)
 
 
