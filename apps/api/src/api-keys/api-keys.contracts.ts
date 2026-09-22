@@ -1,14 +1,13 @@
 import { API_KEY_EXPIRATION } from "@crm/auth";
 import { z } from "zod";
 import { listInput } from "../trpc/list-input";
+import { apiKeyProfile } from "./api-key-profiles";
 
 export const apiKeyListInput = listInput;
 
 export const createApiKeyInput = z.object({
 	name: z.string().trim().min(1).max(64),
-	profile: z
-		.enum(["crm_integration", "hermes_sales"])
-		.default("crm_integration"),
+	profile: apiKeyProfile.default("crm_integration"),
 	expiresInDays: z
 		.number()
 		.int()
@@ -25,6 +24,7 @@ export const apiKeySummaryOutput = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	start: z.string().nullable(),
+	profile: apiKeyProfile.nullable(),
 	enabled: z.boolean(),
 	createdAt: z.string(),
 	lastRequest: z.string().nullable(),

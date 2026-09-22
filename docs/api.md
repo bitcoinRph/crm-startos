@@ -186,20 +186,30 @@ middlewares as the app. It is a wire format, not a second data surface.
   management, SSO and tracking settings stay out. Adding a tool is one entry in
   `mcp-tools.ts`; adding a destructive one is a review question.
 
-### API-key compatibility and scopes
+### An API key carries a profile
 
-New keys use an explicit profile.
-`crm_integration` grants only `crm:read` and `crm:write`.
-`hermes_sales` grants `crm:read`, `sales:read`, and `sales:proposal:write`.
-Sales approval always requires a human session.
-Sales reads and proposal writes always require their explicit scope.
-Scoped keys never receive permissions that are absent from the stored key.
+A key is created with one profile (`api-keys/api-key-profiles.ts`), stored as
+Better Auth's `permissions` on the key. `AuthMiddleware` verifies the key on
+every call and `authorizeApiKeyProcedure` (`trpc/api-key-access.ts`) decides
+from the stored permissions, never from the request.
 
-Keys created before scoped profiles have no stored permission object.
-These legacy member keys keep baseline non-sales query and mutation behavior.
-This compatibility path prevents an unannounced integration outage.
-Operators must replace legacy keys with scoped profiles before a future removal.
-API-key management remains outside MCP.
+| Profile | Permissions | What it can do |
+| --- | --- | --- |
+| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can |
+| `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
+| `agent_read` | `crm:read` | Queries only |
+
+- **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales.*`
+  procedures decide from the `sales` permissions instead (`sales/sales.auth.ts`):
+  a read needs `crm:read` or `sales:read`, a proposal needs
+  `sales:proposal:write`, and approval needs a human session, never a key.
+- **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
+- **A key created before profiles has no permissions and keeps full access.**
+  The table shows it as *Legacy: full access* so the owner can rotate it.
+- **The profile name says what the key can do, not which agent holds it.** The
+  free-text `name` is where "hermes" or "openclaw" goes.
+- **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
+  endpoint. `keyFromHeaders` normalises it before the session is resolved.
 
 ## Two mail providers, one pipeline
 

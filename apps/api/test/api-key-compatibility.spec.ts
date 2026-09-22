@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { MiddlewareOptions } from "nestjs-trpc";
+import { KEY_PERMISSIONS } from "../src/api-keys/api-key-profiles";
 import {
 	authorizeApiKeyProcedure,
 	keyFromHeaders,
@@ -53,11 +54,12 @@ describe("API key transport normalization", () => {
 			keyFromHeaders({ authorization: "Bearer session-token" }),
 		).toBeNull();
 		expect(keyFromHeaders({ authorization: "Basic crm_fixture" })).toBeNull();
+		expect(keyFromHeaders({})).toBeNull();
 	});
 });
 
 describe("session-only API key management", () => {
-	it("denies x-api-key and legacy Bearer credentials with or without a cookie", async () => {
+	it("denies x-api-key and Bearer credentials with or without a cookie", async () => {
 		for (const keyHeader of [
 			{ "x-api-key": "crm_fixture" },
 			{ authorization: "Bearer crm_fixture" },
@@ -83,8 +85,8 @@ describe("session-only API key management", () => {
 	});
 });
 
-describe("API key compatibility policy", () => {
-	it("keeps legacy unscoped member keys on baseline CRM procedures", () => {
+describe("API key access policy", () => {
+	it("keeps legacy unscoped keys on their full access", () => {
 		expect(authorizeApiKeyProcedure(legacy, "contacts.list", "query")).toBe(
 			"allow",
 		);
@@ -93,32 +95,35 @@ describe("API key compatibility policy", () => {
 		).toBe("allow");
 	});
 
-	it("does not broaden a scoped integration key", () => {
-		expect(
-			authorizeApiKeyProcedure(
-				scoped({ crm: ["read"] }),
-				"contacts.list",
-				"query",
-			),
-		).toBe("allow");
-		expect(
-			authorizeApiKeyProcedure(
-				scoped({ crm: ["read"] }),
-				"contacts.update",
-				"mutation",
-			),
-		).toBe("deny");
-		expect(
-			authorizeApiKeyProcedure(
-				scoped({ crm: ["read", "write"] }),
-				"contacts.update",
-				"mutation",
-			),
-		).toBe("allow");
+	it("lets a read-only profile read and nothing else", () => {
+		const key = scoped(KEY_PERMISSIONS.agent_read);
+		expect(authorizeApiKeyProcedure(key, "contacts.list", "query")).toBe(
+			"allow",
+		);
+		expect(authorizeApiKeyProcedure(key, "contacts.update", "mutation")).toBe(
+			"deny",
+		);
 	});
 
-	it("delegates every sales operation to explicit sales scopes", () => {
-		for (const key of [legacy, scoped({ crm: ["read", "write"] })]) {
+	it("lets a propose profile read the CRM but not write it", () => {
+		const key = scoped(KEY_PERMISSIONS.agent_propose);
+		expect(authorizeApiKeyProcedure(key, "companies.byId", "query")).toBe(
+			"allow",
+		);
+		expect(authorizeApiKeyProcedure(key, "companies.update", "mutation")).toBe(
+			"deny",
+		);
+	});
+
+	it("lets an integration profile read and write", () => {
+		const key = scoped(KEY_PERMISSIONS.crm_integration);
+		expect(authorizeApiKeyProcedure(key, "contacts.update", "mutation")).toBe(
+			"allow",
+		);
+	});
+
+	it("delegates every sales procedure to the sales scopes", () => {
+		for (const key of [legacy, scoped(KEY_PERMISSIONS.crm_integration)]) {
 			expect(authorizeApiKeyProcedure(key, "sales.getRequest", "query")).toBe(
 				"sales",
 			);
@@ -128,11 +133,16 @@ describe("API key compatibility policy", () => {
 		}
 	});
 
-	it("denies every key policy access to API key management", () => {
-		for (const key of [legacy, scoped({ crm: ["read", "write"] })]) {
+	it("denies every key access to API key management", () => {
+		for (const key of [
+			legacy,
+			scoped(KEY_PERMISSIONS.crm_integration),
+			scoped(KEY_PERMISSIONS.agent_propose),
+		]) {
 			for (const [path, type] of [
 				["apiKeys.list", "query"],
 				["apiKeys.create", "mutation"],
+				["apiKeys.revoke", "mutation"],
 			] as const) {
 				expect(authorizeApiKeyProcedure(key, path, type)).toBe("deny");
 			}

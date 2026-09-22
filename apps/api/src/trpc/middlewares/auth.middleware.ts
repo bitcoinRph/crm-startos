@@ -38,14 +38,11 @@ export class AuthMiddleware implements TRPCMiddleware {
 		if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
 		const key = await verifiedApiKey(ctx, user.id);
-		if (key) {
-			const decision = authorizeApiKeyProcedure(key, opts.path, opts.type);
-			if (decision === "deny") {
-				throw new TRPCError({
-					code: "FORBIDDEN",
-					message: "API key scope denied.",
-				});
-			}
+		if (key && authorizeApiKeyProcedure(key, opts.path, opts.type) === "deny") {
+			throw new TRPCError({
+				code: "FORBIDDEN",
+				message: "API key scope denied.",
+			});
 		}
 
 		setRequestUserId(user.id);

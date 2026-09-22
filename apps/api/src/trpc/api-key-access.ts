@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { type ApiKeyPermissions, permits } from "../api-keys/api-key-profiles";
 
 export type VerifiedApiKey = {
 	referenceId: string;
-	permissions: Record<string, string[]> | null;
+	permissions: ApiKeyPermissions | null;
 };
 
 export type ApiKeyDecision = "allow" | "deny" | "sales";
@@ -24,14 +25,6 @@ export function keyFromHeaders(headers: HeaderMap): string | null {
 	if (!authorization) return null;
 	const match = /^Bearer (crm_[A-Za-z0-9._~-]+)$/.exec(authorization);
 	return match?.[1] ?? null;
-}
-
-function permits(
-	permissions: Record<string, string[]>,
-	resource: string,
-	action: string,
-): boolean {
-	return permissions[resource]?.includes(action) ?? false;
 }
 
 export function authorizeApiKeyProcedure(
