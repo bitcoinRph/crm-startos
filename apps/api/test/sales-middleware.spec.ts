@@ -20,7 +20,7 @@ afterEach(() => {
 function provider(permissions: Permissions | null, referenceId = "human") {
 	verify = spyOn(auth.api, "verifyApiKey").mockResolvedValue({
 		valid: true,
-		key: { referenceId, permissions },
+		key: { id: "key-1", referenceId, permissions },
 		error: null,
 	} as never);
 	return verify;

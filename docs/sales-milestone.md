@@ -1,7 +1,15 @@
 # Disposable sales workflow
 
 This milestone implements a fixed sales template. It does not restore generic builder or runner delegation.
-Use synthetic data only. Named Andrej is unavailable. This implementation uses an explicit fallback worker.
+Use synthetic data only.
+
+## Who extracts
+
+The supported path is an external agent over MCP or REST with an `agent_propose` key.
+It reads `sales_pending_requests`, extracts with its own model, and stores the result with `sales_store_proposal`.
+It names its model in `producedBy`. The CRM records the key that stored every proposal (`proposedByKeyId`) and the key that created every request (`requestedByKeyId`).
+A request it cannot satisfy is closed with `sales_fail_request`.
+`apps/agent/agent/lib/sales-extraction.ts` extracts with the local Ollama profile, but no scheduler calls it. `apps/agent/test/e2e/sales-worker.e2e.ts` drives it by hand against one synthetic request. Unattended in-CRM extraction is a follow-up (`FOLLOWUPS.md`).
 
 ## Contract
 
@@ -40,9 +48,9 @@ The singleton workspace remains unchanged. This milestone does not add tenancy o
 
 ## Model boundary
 
-Only `qwen-local-experimental / sales-qwen-v1` is selectable.
-The operator configures the existing `CRM_LOCAL_INFERENCE_JSON` allowlist. Users never supply endpoint URLs.
-The agent verifies Ollama 0.34.0 and an installed `qwen3.5:4b` before bounded native warmup.
+Only `qwen-local-experimental / sales-qwen-v1` is selectable. It names the extraction contract the API enforces, not the model that ran. The model is recorded in `producedBy`.
+The operator configures `CRM_LOCAL_INFERENCE_JSON`; on StartOS the package computes it from the Ollama dependency. Users never supply endpoint URLs.
+The in-CRM extractor verifies a listed Ollama version and an installed `qwen3.5:4b` before bounded native warmup.
 Warmup requests 4096 context tokens. The existing guarded adapter verifies loaded context before extraction.
 No model download, remote fallback, generic delegation, or outbound message delivery exists in this template.
 The source limit is 2048 UTF-8 bytes. Extraction uses at most 768 output tokens and one bounded attempt.
@@ -56,7 +64,7 @@ Live local inference, browser acceptance on the final revision, and StartOS rest
 
 ## Limits
 
-The worker executable processes one matching synthetic request per invocation. It is not an unattended production scheduler.
+The e2e worker script processes one matching synthetic request per invocation. It is not an unattended production scheduler.
 Approvals are idempotent per request/proposal. A new intentional request is a separate approval and can create another task.
 Tasks contain the exact requested action. This template does not infer dates, owners, or customer identity.
 The profile revision identifies the reviewed configuration contract, not immutable model weights.

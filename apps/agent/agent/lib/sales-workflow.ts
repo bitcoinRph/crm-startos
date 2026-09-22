@@ -17,7 +17,9 @@ export async function processSalesRequest(
 	save: (proposal: {
 		requestId: string;
 		operations: Awaited<ReturnType<typeof extractSalesNote>>;
+		producedBy: string;
 	}) => Promise<unknown>,
+	producedBy: string,
 	model?: SalesExtractionModel,
 ) {
 	const request = requestSchema.parse(raw);
@@ -32,5 +34,5 @@ export async function processSalesRequest(
 	);
 	if (!operations.length)
 		throw new Error("No supported evidence. Human clarification required.");
-	return save({ requestId: request.id, operations });
+	return save({ requestId: request.id, operations, producedBy });
 }

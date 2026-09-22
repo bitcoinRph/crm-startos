@@ -49,7 +49,12 @@ export async function salesActor(
 				message: "Sales scope denied.",
 			});
 		}
-		return { kind: "apiKey", userId: ctx.user.id, scopes: [scope] };
+		return {
+			kind: "apiKey",
+			userId: ctx.user.id,
+			keyId: verified.key.id,
+			scopes: [scope],
+		};
 	}
 	return {
 		kind: "session",

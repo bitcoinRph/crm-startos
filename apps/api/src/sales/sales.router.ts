@@ -89,7 +89,7 @@ export class SalesRouter {
 	@Query({
 		input: salesPendingInput,
 		output: salesPendingOutput,
-		meta: restMeta("POST", "/sales/requests/pending", ["Sales"]),
+		meta: restMeta("GET", "/sales/requests/pending", ["Sales"]),
 	})
 	async pendingRequests(@Ctx() ctx: AuthedTrpcContext) {
 		return salesPendingOutput.parse(

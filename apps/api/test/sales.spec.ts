@@ -25,11 +25,13 @@ const actor: SalesActor = {
 const reader: SalesActor = {
 	kind: "apiKey",
 	userId: "human",
+	keyId: "key-reader",
 	scopes: [SALES_SCOPES.read],
 };
 const writer: SalesActor = {
 	kind: "apiKey",
 	userId: "worker",
+	keyId: "key-worker",
 	scopes: [SALES_SCOPES.write],
 };
 const readingWriter: SalesActor = {
@@ -129,7 +131,13 @@ function fixture() {
 			}: {
 				data: Pick<
 					SalesProposal,
-					"id" | "requestId" | "idempotencyKey" | "operations"
+					| "id"
+					| "requestId"
+					| "idempotencyKey"
+					| "operations"
+					| "proposedById"
+					| "proposedByKeyId"
+					| "producedBy"
 				>;
 			}) =>
 				(state.proposal = {
@@ -229,7 +237,12 @@ describe("sales persistence service", () => {
 					},
 				) as Db;
 				const service = new SalesService(db);
-				const key: SalesActor = { kind: "apiKey", userId: "worker", scopes };
+				const key: SalesActor = {
+					kind: "apiKey",
+					userId: "worker",
+					keyId: "key-worker",
+					scopes,
+				};
 				let response: unknown;
 				await expect(
 					(async () => {
@@ -300,10 +313,12 @@ describe("sales persistence service", () => {
 		const proposal = await service.storeProposal(readingWriter, {
 			requestId: request.id,
 			operations,
+			producedBy: "synthetic",
 		});
 		const replay = await service.storeProposal(readingWriter, {
 			requestId: request.id,
 			operations,
+			producedBy: "synthetic",
 		});
 		expect(replay.id).toBe(proposal.id);
 		expect(state.contact.title).toBe("Old");
@@ -312,6 +327,7 @@ describe("sales persistence service", () => {
 			service.storeProposal(readingWriter, {
 				requestId: request.id,
 				operations: [operations[0]],
+				producedBy: "synthetic",
 			}),
 		).rejects.toThrow("exists");
 	});
@@ -321,6 +337,7 @@ describe("sales persistence service", () => {
 		const proposal = await service.storeProposal(readingWriter, {
 			requestId: request.id,
 			operations,
+			producedBy: "synthetic",
 		});
 		const approval = {
 			proposalId: proposal.id,
@@ -351,6 +368,7 @@ describe("sales persistence service", () => {
 		const proposal = await service.storeProposal(readingWriter, {
 			requestId: request.id,
 			operations,
+			producedBy: "synthetic",
 		});
 		state.contact.updatedAt = new Date("2026-09-23T00:00:00.000Z");
 		await expect(
@@ -368,6 +386,7 @@ describe("sales persistence service", () => {
 		const proposal = await service.storeProposal(readingWriter, {
 			requestId: request.id,
 			operations,
+			producedBy: "synthetic",
 		});
 		await expect(
 			service.approveProposal(writer, {

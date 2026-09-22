@@ -12,7 +12,7 @@ const fixture = z
 	.parse(JSON.parse(readFileSync(process.argv[2], "utf8")));
 const live = process.argv.includes("--live");
 const deadline = Date.now() + 120000;
-const base = "http://127.0.0.1:33071/rest";
+const base = `${process.env.API_URL ?? "http://127.0.0.1:3001"}/rest`;
 const headers = {
 	"Content-Type": "application/json",
 	"x-api-key": fixture.workerKey,
@@ -50,6 +50,7 @@ while (Date.now() < deadline) {
 						throw new Error(`Store proposal failed: ${response.status}`);
 					return response.json();
 				},
+				live ? "crm-agent/qwen-local-experimental" : "injected-synthetic",
 				live ? undefined : async () => fixture.operations,
 			);
 		} catch (error) {

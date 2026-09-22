@@ -40,9 +40,11 @@ export const salesOperation = z.discriminatedUnion("type", [
 ]);
 export const salesOperations = z.array(salesOperation).min(1).max(3);
 export const salesRequestIdInput = z.strictObject({ requestId: z.uuid() });
+export const salesProducedBy = z.string().trim().min(1).max(120);
 export const salesSubmitInput = z.strictObject({
 	requestId: z.uuid(),
 	operations: salesOperations,
+	producedBy: salesProducedBy,
 });
 export const salesApproveInput = z.strictObject({
 	proposalId: z.uuid(),

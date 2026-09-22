@@ -12,7 +12,7 @@ import { InjectDatabase } from "../database/database.constants";
 
 export type SalesActor =
 	| { userId: string; kind: "session"; sessionId: string }
-	| { userId: string; kind: "apiKey"; scopes: string[] };
+	| { userId: string; kind: "apiKey"; keyId: string; scopes: string[] };
 export const SALES_SCOPES = {
 	read: "sales:read",
 	write: "sales:proposal:write",
@@ -71,6 +71,7 @@ export class SalesService {
 				profileId: input.profileId,
 				profileRevision: input.profileRevision,
 				requestedById: actor.userId,
+				requestedByKeyId: actor.kind === "apiKey" ? actor.keyId : null,
 				status: "PENDING",
 			},
 			include: { proposal: true },
@@ -158,6 +159,9 @@ export class SalesService {
 					idempotencyKey: randomUUID(),
 					requestId: request.id,
 					operations,
+					proposedById: actor.userId,
+					proposedByKeyId: actor.kind === "apiKey" ? actor.keyId : null,
+					producedBy: input.producedBy,
 				},
 			});
 			await tx.salesRequest.update({

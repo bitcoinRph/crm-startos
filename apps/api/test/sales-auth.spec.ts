@@ -33,7 +33,7 @@ type Permissions = Record<string, string[]>;
 function verifyPermissions(granted: Permissions, referenceId = "human") {
 	mockVerify = spyOn(auth.api, "verifyApiKey").mockResolvedValue({
 		valid: true,
-		key: { referenceId, permissions: granted },
+		key: { id: "key-1", referenceId, permissions: granted },
 		error: null,
 	} as never);
 	return mockVerify;
@@ -72,6 +72,7 @@ describe("sales explicit read permissions", () => {
 			).toEqual({
 				kind: "apiKey",
 				userId: "human",
+				keyId: "key-1",
 				scopes: [SALES_SCOPES.read],
 			});
 			expect(verify).toHaveBeenCalledWith({
@@ -245,6 +246,7 @@ describe("sales creation response authorization", () => {
 				{
 					kind: "apiKey",
 					userId: "human",
+					keyId: "key-1",
 					scopes: [SALES_SCOPES.write, SALES_SCOPES.read],
 				},
 				input,
@@ -275,7 +277,7 @@ describe("sales route authorization shared by REST tRPC and MCP", () => {
 	it("rejects an unscoped key for proposal writes using explicit provider permission checks", async () => {
 		mockVerify = spyOn(auth.api, "verifyApiKey").mockResolvedValue({
 			valid: true,
-			key: { referenceId: "human", permissions: null },
+			key: { id: "key-1", referenceId: "human", permissions: null },
 			error: null,
 		} as never);
 		await expect(
@@ -291,7 +293,11 @@ describe("sales route authorization shared by REST tRPC and MCP", () => {
 	it("accepts a verified write key but never treats it as a human", async () => {
 		mockVerify = spyOn(auth.api, "verifyApiKey").mockResolvedValue({
 			valid: true,
-			key: { referenceId: "human", permissions: { sales: ["proposal:write"] } },
+			key: {
+				id: "key-1",
+				referenceId: "human",
+				permissions: { sales: ["proposal:write"] },
+			},
 			error: null,
 		} as never);
 		expect(
@@ -302,6 +308,7 @@ describe("sales route authorization shared by REST tRPC and MCP", () => {
 		).toEqual({
 			kind: "apiKey",
 			userId: "human",
+			keyId: "key-1",
 			scopes: [SALES_SCOPES.write],
 		});
 		await expect(
@@ -330,7 +337,11 @@ describe("sales route authorization shared by REST tRPC and MCP", () => {
 	it("rejects a key belonging to a different session user", async () => {
 		mockVerify = spyOn(auth.api, "verifyApiKey").mockResolvedValue({
 			valid: true,
-			key: { referenceId: "other", permissions: { sales: ["proposal:write"] } },
+			key: {
+				id: "key-1",
+				referenceId: "other",
+				permissions: { sales: ["proposal:write"] },
+			},
 			error: null,
 		} as never);
 		await expect(
