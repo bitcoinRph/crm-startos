@@ -8,6 +8,10 @@ import {
   appPort,
   assetsDir,
   csvList,
+  localInferenceContextWindowTokens,
+  ollamaHostId,
+  ollamaPackageId,
+  ollamaPort,
   postgresDb,
   postgresPort,
   postgresUser,
@@ -66,13 +70,36 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const optional = (name: string, value: string) =>
     value ? { [name]: value } : {}
 
-  const inferenceMode = store.agent.localInference
+  const ollama = store.agent.localInference
+    ? await sdk.host
+        .getBridgeAddress(effects, {
+          packageId: ollamaPackageId,
+          hostId: ollamaHostId,
+          internalPort: ollamaPort,
+        })
+        .const()
+    : null
+  if (store.agent.localInference && !ollama)
+    throw new Error(
+      'Local inference is configured but the Ollama service is not reachable. Install and start Ollama, or clear the model ID in Configure Local Inference.',
+    )
+  const localInference =
+    store.agent.localInference && ollama
+      ? {
+          baseURL: `http://${ollama}/v1`,
+          modelId: store.agent.localInference.modelId,
+          contextWindowTokens: localInferenceContextWindowTokens,
+          maxOutputTokens: store.agent.localInference.maxOutputTokens,
+        }
+      : null
+
+  const inferenceMode = localInference
     ? 'LOCAL'
     : store.agent.aiGatewayApiKey
       ? 'LEGACY_GATEWAY'
       : 'DISABLED'
-  const localInferenceHost = store.agent.localInference
-    ? new URL(store.agent.localInference.baseURL).hostname
+  const localInferenceHost = localInference
+    ? new URL(localInference.baseURL).hostname
     : ''
 
   const env = {
@@ -97,10 +124,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
     ...optional('PERPLEXITY_API_KEY', store.agent.perplexityApiKey),
     ...optional('GITHUB_TOKEN', store.agent.githubToken),
     ...optional('BLOB_READ_WRITE_TOKEN', store.agent.blobToken),
-    ...(store.agent.localInference
-      ? {
-          CRM_LOCAL_INFERENCE_JSON: JSON.stringify(store.agent.localInference),
-        }
+    ...(localInference
+      ? { CRM_LOCAL_INFERENCE_JSON: JSON.stringify(localInference) }
       : {}),
   }
 

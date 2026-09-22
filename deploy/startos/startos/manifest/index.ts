@@ -1,5 +1,5 @@
 import { setupManifest } from '@start9labs/start-sdk'
-import { long, short } from './i18n'
+import { long, ollamaDependency, short } from './i18n'
 
 export const manifest = setupManifest({
   id: 'crm',
@@ -23,5 +23,11 @@ export const manifest = setupManifest({
       arch: ['x86_64', 'aarch64'],
     },
   },
-  dependencies: {},
+  dependencies: {
+    ollama: {
+      description: ollamaDependency,
+      optional: true,
+      s9pk: null,
+    },
+  },
 })

@@ -1,90 +1,44 @@
-import { storeJson } from '../fileModels/store.json'
+import { type LocalInference, storeJson } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
+import { localInferenceMaxOutputTokens } from '../utils'
 
 const { InputSpec, Value } = sdk
 
 export type LocalInferenceActionInput = {
-  baseURL?: string | null
   modelId?: string | null
-  contextWindowTokens?: number | null
   maxOutputTokens?: number | null
 }
 
-export type LocalInferenceConfiguration = {
-  baseURL: string
-  modelId: string
-  contextWindowTokens: 4096
-  maxOutputTokens: number
-}
+const modelIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/
 
 export function normalizeLocalInferenceInput(
   input: LocalInferenceActionInput,
-): LocalInferenceConfiguration | undefined {
-  const baseURL = input.baseURL?.trim() ?? ''
+): LocalInference | undefined {
   const modelId = input.modelId?.trim() ?? ''
-  if (!baseURL && !modelId) return undefined
-  if (!baseURL || !modelId)
-    throw new Error('Endpoint and model ID must be set together')
+  if (!modelId) return undefined
 
-  const contextWindowTokens = input.contextWindowTokens ?? 4096
-  const maxOutputTokens = input.maxOutputTokens ?? 1024
+  const maxOutputTokens = input.maxOutputTokens ?? localInferenceMaxOutputTokens
 
-  try {
-    const url = new URL(baseURL)
-    if (
-      !['http:', 'https:'].includes(url.protocol) ||
-      !['ollama.embassy', 'localhost', '127.0.0.1', '[::1]'].includes(
-        url.hostname,
-      ) ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      url.pathname !== '/v1' ||
-      baseURL !== url.href
-    ) {
-      throw new Error('Invalid endpoint')
-    }
-    if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(modelId))
-      throw new Error('Invalid model ID')
-    if (contextWindowTokens !== 4096)
-      throw new Error('Context window must be 4096')
-    if (maxOutputTokens < 1 || maxOutputTokens > 1024)
-      throw new Error('Max output tokens must be 1-1024')
-    if (maxOutputTokens >= contextWindowTokens)
-      throw new Error('Max output must be less than context window')
-  } catch (err) {
+  if (!modelIdPattern.test(modelId))
+    throw new Error('Local inference configuration invalid: Invalid model ID')
+  if (
+    !Number.isInteger(maxOutputTokens) ||
+    maxOutputTokens < 1 ||
+    maxOutputTokens > localInferenceMaxOutputTokens
+  )
     throw new Error(
-      `Local inference configuration invalid: ${err instanceof Error ? err.message : 'unknown error'}`,
+      `Local inference configuration invalid: Max output tokens must be 1-${localInferenceMaxOutputTokens}`,
     )
-  }
 
-  return { baseURL, modelId, contextWindowTokens: 4096, maxOutputTokens }
+  return { modelId, maxOutputTokens }
 }
 
 export const inputSpec = InputSpec.of({
-  baseURL: Value.text({
-    name: i18n('Local inference endpoint'),
-    description: i18n(
-      'HTTP(S) URL to an OpenAI-compatible local inference server. Only ollama.embassy, localhost, 127.0.0.1 and [::1] are allowed. No credentials or query parameters.',
-    ),
-    required: false,
-    default: null,
-    patterns: [
-      {
-        regex:
-          '^https?://(ollama\\.embassy|localhost|127\\.0\\.0\\.1|\\[::1\\])(:\\d+)?/v1$',
-        description: i18n(
-          'Must be an approved local /v1 endpoint without credentials or query parameters.',
-        ),
-      },
-    ],
-  }),
   modelId: Value.text({
     name: i18n('Model ID'),
     description: i18n(
-      'The model identifier passed to the local server. Exact match required. No spaces.',
+      'The model tag pulled in the Ollama service, for example qwen3.5:4b. Exact match. Leave empty to turn local inference off.',
     ),
     required: false,
     default: null,
@@ -97,26 +51,15 @@ export const inputSpec = InputSpec.of({
       },
     ],
   }),
-  contextWindowTokens: Value.number({
-    name: i18n('Context window tokens'),
-    description: i18n(
-      'The exact context window size the runner allocates. Must be 4096 for the verified Qwen profile.',
-    ),
-    required: false,
-    default: 4096,
-    min: 4096,
-    max: 4096,
-    integer: true,
-  }),
   maxOutputTokens: Value.number({
     name: i18n('Max output tokens'),
     description: i18n(
       'Maximum tokens the model will generate per response. Must be between 1 and 1024.',
     ),
     required: false,
-    default: 1024,
+    default: localInferenceMaxOutputTokens,
     min: 1,
-    max: 1024,
+    max: localInferenceMaxOutputTokens,
     integer: true,
   }),
 })
@@ -127,7 +70,7 @@ export const configureLocalInference = sdk.Action.withInput(
   async () => ({
     name: i18n('Configure Local Inference'),
     description: i18n(
-      'Connect the research agent to a local model server instead of the cloud gateway. The server must already be running and the model pre-loaded. No cloud fallback exists.',
+      'Run the research agent on the Ollama service installed on this server instead of the cloud gateway. Install Ollama from the marketplace, pull the model, then enter its ID here. Nothing falls back to the cloud.',
     ),
     warning: null,
     allowedStatuses: 'any',
@@ -140,26 +83,15 @@ export const configureLocalInference = sdk.Action.withInput(
   async () => {
     const agent = await storeJson.read((s) => s.agent.localInference).once()
     return {
-      baseURL: agent?.baseURL ?? null,
       modelId: agent?.modelId ?? null,
-      contextWindowTokens: agent?.contextWindowTokens ?? 4096,
-      maxOutputTokens: agent?.maxOutputTokens ?? 1024,
+      maxOutputTokens: agent?.maxOutputTokens ?? localInferenceMaxOutputTokens,
     }
   },
 
   async ({ effects, input }) => {
     const configuration = normalizeLocalInferenceInput(input)
-    if (!configuration) {
-      await storeJson.merge(effects, {
-        agent: { localInference: undefined },
-      })
-      return
-    }
-
     await storeJson.merge(effects, {
-      agent: {
-        localInference: configuration,
-      },
+      agent: { localInference: configuration },
     })
   },
 )

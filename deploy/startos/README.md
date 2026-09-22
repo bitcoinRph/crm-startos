@@ -129,7 +129,7 @@ Both interfaces share one binding; the app proxies `/api/*` to the API, so the M
 | Set Sign-in Credentials (`set-admin-credentials`) | Create or reset the password account; also surfaced as the install task | Any status; visible | Email; optional password (generated when empty) | Email and password, once |
 | Configure Sign-in (`configure-sign-in`) | Allow-list, public URL, Google and Microsoft OAuth clients | Any status; visible | Text fields, secrets masked | — |
 | Configure Research Agent (`configure-agent`) | Explicit legacy Gateway mode plus optional Perplexity, GitHub and Vercel Blob keys; telemetry switch | Any status; visible | Text fields, secrets masked; toggle | — |
-| Configure Local Inference (`configure-local-inference`) | Local Ollama-compatible endpoint and verified model profile | Any status; visible | Endpoint, model ID and fixed token limits | — |
+| Configure Local Inference (`configure-local-inference`) | Run the agent on the Ollama service installed on this server | Any status; visible | Model ID (empty turns local inference off) and max output tokens | — |
 
 Every action writes `store.json`; `main.ts` reads the store with `.const()`, so a change restarts the service.
 
@@ -141,7 +141,7 @@ Every action writes `store.json`; `main.ts` reads the store with `.const()`, so 
 
 ## Local inference
 
-A new **Configure Local Inference** action stores `baseURL`, `modelId`, `contextWindowTokens` (4096) and `maxOutputTokens` in `store.json` under `agent.localInference`. When set, `main.ts` selects `LOCAL`, passes `CRM_LOCAL_INFERENCE_JSON`, and allow-lists the endpoint host. Local configuration takes precedence over a stored Gateway key and never falls back to cloud inference. When local configuration is absent, a configured Gateway key selects explicit `LEGACY_GATEWAY`; with neither configuration, inference is disabled. No automatic model download or dependency is introduced.
+**Configure Local Inference** stores `modelId` and `maxOutputTokens` in `store.json` under `agent.localInference`. The endpoint is never an input: when a model is set, `dependencies.ts` requires the `ollama` package (`>=0.34.0:0`, health check `primary`) and `main.ts` resolves its bridge address with `sdk.host.getBridgeAddress(effects, { packageId: 'ollama', hostId: 'api-multi', internalPort: 11434 })`, which is the only route from this container to another package (`10.0.3.1:<assigned port>`; `.embassy` and loopback names do not reach it). `main.ts` then selects `LOCAL`, passes `CRM_LOCAL_INFERENCE_JSON` with `baseURL: http://<bridge>/v1` and the fixed 4096-token context, and allow-lists the bridge host in `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`. If a model is set and Ollama is not reachable, `main.ts` throws and the service shows the error instead of starting with a dead endpoint; `.const()` re-runs it when the address changes. Local configuration takes precedence over a stored Gateway key and never falls back to cloud inference. Without a model, a configured Gateway key selects explicit `LEGACY_GATEWAY`; with neither, inference is disabled.
 
 ## Health Checks
 
@@ -155,7 +155,11 @@ A new **Configure Local Inference** action stores `baseURL`, `modelId`, `context
 
 ## Dependencies
 
-None.
+| Package | Kind | When | Why |
+| --- | --- | --- | --- |
+| `ollama` (Start9's [ollama-startos](https://github.com/Start9Labs/ollama-startos)) | Optional; `running`, `>=0.34.0:0`, health check `primary` | Only while **Configure Local Inference** names a model | Serves the local model over its `api-multi` binding on port 11434; reached through the bridge address |
+
+Pull the model inside the Ollama service before naming it here (`ollama pull qwen3.5:4b`). The CRM does not download models.
 
 ## Limitations and Differences
 

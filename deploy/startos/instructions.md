@@ -18,7 +18,7 @@ Password sign-in is on, so nothing outside your network is needed to get in. Goo
 2. Start the service and open the **Web UI** interface. Sign in with the email and password from step 1. The first account to sign in owns the workspace.
 3. Complete the onboarding: name the workspace and enter your website. Research integrations remain optional and can be configured later.
 4. Select one inference route:
-   - Run **Configure Local Inference** for the verified local model profile. The model must already be installed and available.
+   - Install **Ollama** from the marketplace, open its Ollama API interface and pull a model (for example `ollama pull qwen3.5:4b`). Then run **Configure Local Inference** and enter that model ID. The CRM finds the Ollama service on its own; there is no address to type.
    - Or run **Configure Research Agent** and provide a Vercel AI Gateway key for explicit legacy mode.
    - Leave both unset to keep inference disabled while the CRM remains available.
 
@@ -74,7 +74,7 @@ The agent gets tools to search the CRM, read and update companies, contacts and 
 - **Set Sign-in Credentials** — create or reset the password account. Takes effect on the next start.
 - **Configure Sign-in** — the allow-list, the public URL, and Google or Microsoft sign-in.
 - **Configure Research Agent** — explicit legacy Gateway mode and optional Perplexity, GitHub and Vercel Blob keys, plus telemetry.
-- **Configure Local Inference** — the local endpoint, installed model ID and verified token limits.
+- **Configure Local Inference** — the model ID pulled in the Ollama service and the output token cap. Leave the model ID empty to turn local inference off. While a model is set, the Ollama service is a required dependency and the CRM does not start without it.
 
 ## Limitations
 
