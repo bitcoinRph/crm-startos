@@ -238,17 +238,11 @@ describe("proxy", () => {
 		).toBe("/onboarding");
 	});
 
-	it("takes a settled rep off both setup pages and into the workspace", async () => {
+	it("takes a settled rep off the setup page and into the workspace", async () => {
 		setup();
 
 		expect(
 			redirectedTo(await proxy(request("/onboarding", [SESSION_COOKIE]))),
-		).toBe(`/${SLUG}`);
-
-		expect(
-			redirectedTo(
-				await proxy(request("/onboarding/research", [SESSION_COOKIE])),
-			),
 		).toBe(`/${SLUG}`);
 	});
 
@@ -340,16 +334,6 @@ describe("the research key gate", () => {
 				await proxy(request(`/${SLUG}/companies`, [SESSION_COOKIE])),
 			),
 		).toBeNull();
-	});
-
-	it("retires the key form and opens the workspace", async () => {
-		setup({ configured: false });
-
-		expect(
-			redirectedTo(
-				await proxy(request("/onboarding/research", [SESSION_COOKIE])),
-			),
-		).toBe(`/${SLUG}`);
 	});
 
 	it("asks the first question first when both are outstanding", async () => {

@@ -12,16 +12,17 @@ import {
 import { requireSession } from "@/lib/session";
 import { SalesWorkflow } from "./sales-workflow";
 
-export const metadata: Metadata = { title: "Sales workflow" };
+export const metadata: Metadata = { title: "Sales proposals" };
 
 export default function SalesPage() {
 	return (
 		<PageShell>
 			<PageShellHeader>
 				<PageShellHeading>
-					<PageShellTitle>Sales workflow</PageShellTitle>
+					<PageShellTitle>Sales proposals</PageShellTitle>
 					<PageShellDescription>
-						Turn a synthetic note into a reviewed, evidence-backed proposal.
+						Review the changes an agent proposes from a customer note, then
+						approve or discard them.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>

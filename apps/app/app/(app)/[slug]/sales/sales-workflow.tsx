@@ -11,6 +11,11 @@ import {
 	CardTitle,
 } from "@crm/ui/components/card";
 import {
+	DescriptionDetails,
+	DescriptionList,
+	DescriptionTerm,
+} from "@crm/ui/components/description-list";
+import {
 	Field,
 	FieldDescription,
 	FieldGroup,
@@ -94,11 +99,11 @@ export function SalesWorkflow() {
 	return (
 		<div className="flex flex-col gap-6">
 			<Alert>
-				<AlertTitle>Fixed sales template</AlertTitle>
+				<AlertTitle>Evidence-backed proposals</AlertTitle>
 				<AlertDescription>
-					This is not a generic agent. Use synthetic notes only. The worker
-					proposes a job title, note, or task. No CRM records change before
-					approval.
+					Paste one customer note for one contact. An agent holding a propose
+					key files a job title, a note, or a task quoted from that note. No CRM
+					record changes before you approve it here.
 				</AlertDescription>
 			</Alert>
 			{error && (
@@ -117,7 +122,8 @@ export function SalesWorkflow() {
 					<CardHeader>
 						<CardTitle>Prepare a proposal</CardTitle>
 						<CardDescription>
-							Select one customer and review the current contact revision.
+							Choose the contact, confirm its current revision, then paste the
+							note.
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -213,20 +219,24 @@ export function SalesWorkflow() {
 											{contact.data.title ?? "None"}.
 										</FieldDescription>
 										{!revision.success && (
-											<p role="alert">
-												The contact API does not provide a valid current
-												revision. Submission is disabled.
-											</p>
+											<Alert variant="destructive">
+												<AlertDescription>
+													The contact API does not provide a valid current
+													revision. Submission is disabled.
+												</AlertDescription>
+											</Alert>
 										)}
 										{contact.data.archivedAt && (
-											<p role="alert">
-												This contact is archived. Select an active contact.
-											</p>
+											<Alert variant="destructive">
+												<AlertDescription>
+													This contact is archived. Select an active contact.
+												</AlertDescription>
+											</Alert>
 										)}
 									</Field>
 								)}
 								<Field>
-									<FieldLabel htmlFor="sales-source">Synthetic note</FieldLabel>
+									<FieldLabel htmlFor="sales-source">Customer note</FieldLabel>
 									<Textarea
 										id="sales-source"
 										required
@@ -315,37 +325,45 @@ export function SalesRequestReview({
 					<div role="status">
 						Status: <Badge variant="outline">{request.status}</Badge>
 					</div>
-					<dl className="grid gap-2 break-words">
-						<dt>Request ID</dt>
-						<dd>{request.id}</dd>
-						<dt>Customer</dt>
-						<dd>
+					<DescriptionList>
+						<DescriptionTerm>Request ID</DescriptionTerm>
+						<DescriptionDetails>{request.id}</DescriptionDetails>
+						<DescriptionTerm>Customer</DescriptionTerm>
+						<DescriptionDetails>
 							{request.contactSnapshot.firstName}{" "}
 							{request.contactSnapshot.lastName} ·{" "}
 							{request.contactSnapshot.email}
-						</dd>
-						<dt>Contact ID</dt>
-						<dd>{request.contactId}</dd>
-						<dt>Expected contact revision</dt>
-						<dd>{request.expectedUpdatedAt}</dd>
-						<dt>Current title at request</dt>
-						<dd>{request.contactSnapshot.title ?? "None"}</dd>
-						<dt>Profile / revision</dt>
-						<dd>
+						</DescriptionDetails>
+						<DescriptionTerm>Contact ID</DescriptionTerm>
+						<DescriptionDetails>{request.contactId}</DescriptionDetails>
+						<DescriptionTerm>Expected contact revision</DescriptionTerm>
+						<DescriptionDetails>{request.expectedUpdatedAt}</DescriptionDetails>
+						<DescriptionTerm>Current title at request</DescriptionTerm>
+						<DescriptionDetails>
+							{request.contactSnapshot.title ?? "None"}
+						</DescriptionDetails>
+						<DescriptionTerm>Contract</DescriptionTerm>
+						<DescriptionDetails>
 							{request.profileId} / {request.profileRevision}
-						</dd>
-						<dt>Exact source</dt>
-						<dd className="whitespace-pre-wrap">{request.source}</dd>
-					</dl>
+						</DescriptionDetails>
+						<DescriptionTerm>Requested with</DescriptionTerm>
+						<DescriptionDetails>
+							{request.requestedByKeyId
+								? `API key ${request.requestedByKeyId}`
+								: "Browser session"}
+						</DescriptionDetails>
+						<DescriptionTerm>Exact source</DescriptionTerm>
+						<DescriptionDetails>{request.source}</DescriptionDetails>
+					</DescriptionList>
 					{request.status === "PENDING" && (
 						<p role="status">
-							Waiting for the worker. No contact, note, or task writes occur
-							while pending.
+							Waiting for an agent to file a proposal. No contact, note, or task
+							changes while pending.
 						</p>
 					)}
 					{request.error && (
 						<Alert variant="destructive">
-							<AlertTitle>Worker error</AlertTitle>
+							<AlertTitle>Agent error</AlertTitle>
 							<AlertDescription>{request.error}</AlertDescription>
 						</Alert>
 					)}
@@ -359,16 +377,31 @@ export function SalesRequestReview({
 								</CardDescription>
 							</CardHeader>
 							<CardContent>
-								<dl className="grid gap-2 break-words">
-									<dt>Exact value</dt>
-									<dd className="whitespace-pre-wrap">{operation.value}</dd>
-									<dt>Exact evidence</dt>
-									<dd className="whitespace-pre-wrap">{operation.evidence}</dd>
-								</dl>
+								<DescriptionList>
+									<DescriptionTerm>Exact value</DescriptionTerm>
+									<DescriptionDetails>{operation.value}</DescriptionDetails>
+									<DescriptionTerm>Exact evidence</DescriptionTerm>
+									<DescriptionDetails>{operation.evidence}</DescriptionDetails>
+								</DescriptionList>
 							</CardContent>
 						</Card>
 					))}
-					{proposal && <p>Proposal ID: {proposal.id}</p>}
+					{proposal && (
+						<DescriptionList>
+							<DescriptionTerm>Proposal ID</DescriptionTerm>
+							<DescriptionDetails>{proposal.id}</DescriptionDetails>
+							<DescriptionTerm>Produced by</DescriptionTerm>
+							<DescriptionDetails>
+								{proposal.producedBy ?? "Unknown"}
+							</DescriptionDetails>
+							<DescriptionTerm>Filed with</DescriptionTerm>
+							<DescriptionDetails>
+								{proposal.proposedByKeyId
+									? `API key ${proposal.proposedByKeyId}`
+									: "Browser session"}
+							</DescriptionDetails>
+						</DescriptionList>
+					)}
 					{proposal &&
 						request.status === "PROPOSED" &&
 						!proposal.approvedAt && (

@@ -4,11 +4,9 @@ import { API_URL } from "@/lib/env";
 
 export const ONBOARDING_PATH = "/onboarding";
 
-export const RESEARCH_PATH = "/onboarding/research";
-
 const GATE_TIMEOUT_MS = 2_000;
 
-export type Gate = "settled" | "required" | "unknown";
+type Gate = "settled" | "required" | "unknown";
 
 const procedureResult = z
 	.object({ result: z.object({ data: z.json() }).catch({ data: null }) })

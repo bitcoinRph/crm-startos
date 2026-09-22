@@ -2,11 +2,7 @@ import { AUTH_COOKIE_PREFIX } from "@crm/auth/cookies";
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import { isMarketing } from "@/lib/env";
-import {
-	ONBOARDING_PATH,
-	RESEARCH_PATH,
-	readWorkspaceGate,
-} from "@/lib/onboarding";
+import { ONBOARDING_PATH, readWorkspaceGate } from "@/lib/onboarding";
 import { workspaceUrl } from "@/lib/workspace-url";
 
 const LANDING_PATH = "/";
@@ -80,7 +76,7 @@ function isAnonymous(pathname: string): boolean {
 }
 
 function isSetup(pathname: string): boolean {
-	return pathname === ONBOARDING_PATH || pathname === RESEARCH_PATH;
+	return pathname === ONBOARDING_PATH;
 }
 
 function sendTo(path: string, request: NextRequest): NextResponse {
