@@ -10,7 +10,7 @@ export type ApiKeyProfile = (typeof API_KEY_PROFILES)[number];
 
 export const apiKeyProfile = z.enum(API_KEY_PROFILES);
 
-export const apiKeyPermissions = z.record(z.string(), z.array(z.string()));
+const apiKeyPermissions = z.record(z.string(), z.array(z.string()));
 
 export type ApiKeyPermissions = z.infer<typeof apiKeyPermissions>;
 
