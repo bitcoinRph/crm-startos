@@ -36,6 +36,11 @@ import { SEARCH_PARAM } from "@/lib/search-param-keys";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import {
+	API_KEY_PROFILE_OPTIONS,
+	type ApiKeyProfileValue,
+	DEFAULT_API_KEY_PROFILE,
+} from "./api-key-profiles";
 import { CreatedApiKeyDialog } from "./created-api-key-dialog";
 
 const FORM = "create-api-key";
@@ -73,6 +78,7 @@ function CreateApiKeyForm() {
 	const cache = useCrmCache();
 
 	const nameId = useId();
+	const profileId = useId();
 	const expirationId = useId();
 
 	const [open, setOpen] = useQueryState(
@@ -80,8 +86,15 @@ function CreateApiKeyForm() {
 		parseAsBoolean.withDefault(false),
 	);
 	const [name, setName] = useState("");
+	const [profile, setProfile] = useState<ApiKeyProfileValue>(
+		DEFAULT_API_KEY_PROFILE,
+	);
 	const [expiration, setExpiration] = useState<ExpirationValue>("90");
 	const [created, setCreated] = useState<CreatedApiKey | null>(null);
+
+	const selectedProfile =
+		API_KEY_PROFILE_OPTIONS.find((option) => option.value === profile) ??
+		API_KEY_PROFILE_OPTIONS[0];
 
 	const create = useMutation(
 		trpc.apiKeys.create.mutationOptions({
@@ -89,6 +102,7 @@ function CreateApiKeyForm() {
 				await cache.apiKeys();
 				await setOpen(null);
 				setName("");
+				setProfile(DEFAULT_API_KEY_PROFILE);
 				setExpiration("90");
 				setCreated(apiKey);
 			},
@@ -107,8 +121,7 @@ function CreateApiKeyForm() {
 					<SheetHeader>
 						<SheetTitle>New API key</SheetTitle>
 						<SheetDescription>
-							Acts as you. Anything it can read or change is exactly what you
-							can.
+							Acts as you, within the access you choose here.
 						</SheetDescription>
 					</SheetHeader>
 
@@ -119,6 +132,7 @@ function CreateApiKeyForm() {
 							event.preventDefault();
 							create.mutate({
 								name: name.trim(),
+								profile,
 								expiresInDays:
 									expiration === "never" ? null : Number(expiration),
 							});
@@ -131,7 +145,7 @@ function CreateApiKeyForm() {
 									id={nameId}
 									value={name}
 									onChange={(event) => setName(event.target.value)}
-									placeholder="CI pipeline"
+									placeholder="hermes"
 									maxLength={64}
 									autoComplete="off"
 									autoCapitalize="off"
@@ -140,7 +154,32 @@ function CreateApiKeyForm() {
 									required
 								/>
 								<FieldDescription>
-									Something you will recognise later, like where it runs.
+									Which agent or system holds it, so you can revoke the right
+									one later.
+								</FieldDescription>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor={profileId}>Access</FieldLabel>
+								<Select
+									value={profile}
+									onValueChange={(value) =>
+										setProfile(value as ApiKeyProfileValue)
+									}
+								>
+									<SelectTrigger id={profileId} className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{API_KEY_PROFILE_OPTIONS.map((option) => (
+											<SelectItem key={option.value} value={option.value}>
+												{option.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<FieldDescription>
+									{selectedProfile.description}
 								</FieldDescription>
 							</Field>
 
