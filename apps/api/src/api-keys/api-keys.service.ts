@@ -14,6 +14,11 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
+import {
+	KEY_PERMISSIONS,
+	parseStoredPermissions,
+	profileOf,
+} from "./api-key-profiles";
 import type {
 	ApiKeyListInput,
 	ApiKeySummary,
@@ -26,6 +31,7 @@ const KEY_SELECT = {
 	id: true,
 	name: true,
 	start: true,
+	permissions: true,
 	enabled: true,
 	createdAt: true,
 	lastRequest: true,
@@ -55,6 +61,7 @@ function toSummary(row: KeyRow): ApiKeySummary {
 		id: row.id,
 		name: row.name,
 		start: row.start,
+		profile: profileOf(parseStoredPermissions(row.permissions)),
 		enabled: row.enabled ?? true,
 		createdAt: row.createdAt.toISOString(),
 		lastRequest: row.lastRequest?.toISOString() ?? null,
@@ -99,6 +106,7 @@ export class ApiKeysService {
 				headers,
 				body: {
 					name: input.name,
+					permissions: KEY_PERMISSIONS[input.profile],
 					expiresIn:
 						input.expiresInDays === null
 							? null
@@ -117,6 +125,7 @@ export class ApiKeysService {
 			id: created.id,
 			name: created.name,
 			start: created.start,
+			profile: input.profile,
 			enabled: created.enabled,
 			createdAt: created.createdAt.toISOString(),
 			lastRequest: created.lastRequest?.toISOString() ?? null,

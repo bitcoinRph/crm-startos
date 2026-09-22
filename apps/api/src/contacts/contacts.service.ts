@@ -167,6 +167,7 @@ export class ContactsService {
 				imageUrl: true,
 				enrichmentStatus: true,
 				enrichmentError: true,
+				updatedAt: true,
 				createdAt: true,
 				archivedAt: true,
 				brief: {
@@ -232,6 +233,7 @@ export class ContactsService {
 		return {
 			...rest,
 			company,
+			updatedAt: contact.updatedAt.toISOString(),
 			fields: await this.fields.valuesFor("CONTACT", id),
 			queued: await this.queue.isQueued({ contactId: id }),
 			createdAt: createdAt.toISOString(),

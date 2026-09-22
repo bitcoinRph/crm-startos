@@ -19,3 +19,16 @@ export const long = {
   fr_FR:
     'Comp AI CRM réunit entreprises, contacts et affaires au même endroit et laisse un agent de recherche autonome compléter ce qu’il peut prouver à partir de vos e-mails, de votre agenda et du web ouvert. Ce paquet regroupe l’application web, l’API, l’agent et une base PostgreSQL, ajoute une connexion par mot de passe pour les réseaux privés et expose un point de terminaison MCP pour que Claude Code, Codex ou Hermes travaillent dans le CRM avec une clé d’API.',
 }
+
+export const ollamaDependency = {
+  en_US:
+    'Runs the local model for the research agent when Configure Local Inference names a model. Not needed for the CRM itself.',
+  es_ES:
+    'Ejecuta el modelo local del agente de investigación cuando Configurar inferencia local indica un modelo. El CRM no lo necesita.',
+  de_DE:
+    'Führt das lokale Modell für den Recherche-Agenten aus, wenn „Lokale Inferenz konfigurieren“ ein Modell nennt. Für das CRM selbst nicht nötig.',
+  pl_PL:
+    'Uruchamia lokalny model agenta badawczego, gdy Konfiguruj lokalną inferencję wskazuje model. Sam CRM go nie potrzebuje.',
+  fr_FR:
+    'Exécute le modèle local de l’agent de recherche lorsque Configurer l’inférence locale nomme un modèle. Le CRM lui-même n’en a pas besoin.',
+}

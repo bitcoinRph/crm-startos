@@ -8,6 +8,10 @@ import {
   appPort,
   assetsDir,
   csvList,
+  localInferenceContextWindowTokens,
+  ollamaHostId,
+  ollamaPackageId,
+  ollamaPort,
   postgresDb,
   postgresPort,
   postgresUser,
@@ -66,6 +70,38 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const optional = (name: string, value: string) =>
     value ? { [name]: value } : {}
 
+  const ollama = store.agent.localInference
+    ? await sdk.host
+        .getBridgeAddress(effects, {
+          packageId: ollamaPackageId,
+          hostId: ollamaHostId,
+          internalPort: ollamaPort,
+        })
+        .const()
+    : null
+  if (store.agent.localInference && !ollama)
+    throw new Error(
+      'Local inference is configured but the Ollama service is not reachable. Install and start Ollama, or clear the model ID in Configure Local Inference.',
+    )
+  const localInference =
+    store.agent.localInference && ollama
+      ? {
+          baseURL: `http://${ollama}/v1`,
+          modelId: store.agent.localInference.modelId,
+          contextWindowTokens: localInferenceContextWindowTokens,
+          maxOutputTokens: store.agent.localInference.maxOutputTokens,
+        }
+      : null
+
+  const inferenceMode = localInference
+    ? 'LOCAL'
+    : store.agent.aiGatewayApiKey
+      ? 'LEGACY_GATEWAY'
+      : 'DISABLED'
+  const localInferenceHost = localInference
+    ? new URL(localInference.baseURL).hostname
+    : ''
+
   const env = {
     NODE_ENV: 'production',
     DATABASE_URL: databaseUrl,
@@ -78,6 +114,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
     AGENT_URL: `http://127.0.0.1:${agentPort}`,
     AGENT_BRIDGE_SECRET: store.bridgeSecret,
     CRON_SECRET: store.cronSecret,
+    CRM_INFERENCE_MODE: inferenceMode,
+    ...optional('CRM_LOCAL_INFERENCE_ALLOWED_HOSTS', localInferenceHost),
     NEXT_TELEMETRY_DISABLED: '1',
     ...(store.agent.telemetry ? {} : { CRM_TELEMETRY_DISABLED: '1' }),
     ...google,
@@ -86,6 +124,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
     ...optional('PERPLEXITY_API_KEY', store.agent.perplexityApiKey),
     ...optional('GITHUB_TOKEN', store.agent.githubToken),
     ...optional('BLOB_READ_WRITE_TOKEN', store.agent.blobToken),
+    ...(localInference
+      ? { CRM_LOCAL_INFERENCE_JSON: JSON.stringify(localInference) }
+      : {}),
   }
 
   const postgresSub = sdk.SubContainer.of(

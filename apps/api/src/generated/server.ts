@@ -26,6 +26,8 @@ import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput, fieldEntityInput, fieldFiltersOutput, fieldIdInput, fieldCoverageOutput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput, fieldReorderOutput, fieldDeleteOutput, fieldBackfillOutput } from "../fields/fields.contracts";
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
+import { salesRequestInput, salesRequestIdInput, salesSubmitInput, salesApproveInput } from "@crm/validation/sales";
+import { salesRequestOutput, salesPendingInput, salesPendingOutput, salesProposalOutput } from "../sales/sales.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput } from "../settings/settings.contracts";
 import { slackStatusOutput, slackMatchesOutput, slackChannelsInput, slackChannelsOutput, slackJoinChannelInput, slackJoinChannelOutput, slackRefreshPeopleOutput, slackCreateChannelInput, slackCreateChannelOutput, slackDisconnectOutput } from "../slack/slack.contracts";
@@ -574,6 +576,32 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .output(microsoftConnectionStatusOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  sales: t.router({
+    createRequest: publicProcedure
+      .input(salesRequestInput)
+      .output(salesRequestOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    getRequest: publicProcedure
+      .input(salesRequestIdInput)
+      .output(salesRequestOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    failRequest: publicProcedure
+      .input(salesRequestIdInput)
+      .output(salesRequestOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    pendingRequests: publicProcedure
+      .input(salesPendingInput)
+      .output(salesPendingOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    storeProposal: publicProcedure
+      .input(salesSubmitInput)
+      .output(salesProposalOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    approveProposal: publicProcedure
+      .input(salesApproveInput)
+      .output(salesProposalOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   savedViews: t.router({

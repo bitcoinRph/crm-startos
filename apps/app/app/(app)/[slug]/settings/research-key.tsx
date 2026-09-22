@@ -52,10 +52,11 @@ export function ResearchKey() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Company research</CardTitle>
+				<CardTitle>Company research (optional)</CardTitle>
 				<CardDescription>
-					Enter your Context API key so our agents can research every company in
-					the CRM.
+					Use the CRM without a Context API key. Add a key to enable Context
+					company research. Local inference is configured separately by your
+					deployment administrator.
 				</CardDescription>
 
 				<CardAction>

@@ -11,16 +11,19 @@ are in `docs/setup.md`.
 
 ## Model
 
-Default `zai/glm-5.2-fast`; `DEFAULT_AGENT_MODEL` in `@crm/db/settings` because the
-agent and the API both need it.
+The operator selects `LOCAL` or `LEGACY_GATEWAY` through `CRM_INFERENCE_MODE`.
+See `docs/local-inference.md` for the complete mode and session contract.
 
-- **A row (`AppSetting`), not an env var**, via `defineDynamic` on `session.started`.
-  Open conversations keep their model — prompt caches are per model.
-- **`lib/model.ts` always sends `modelContextWindowTokens`**; eve never inherits it.
-- **A failed read logs and keeps the compiled fallback.** Never throws.
-- **The chooser offers only `tool-use` models** (`ModelCatalogService`).
-- **Not a frontier model, deliberately** — refusing wrong answers is enforced by the
-  tools and evidence model, not model strength.
+- Missing or invalid mode configuration disables inference, not CRM startup.
+- Local mode runs only the fixed sales extraction (`lib/sales-extraction.ts`) through the guarded local adapter and never falls back to Gateway.
+- In local mode the research chat, builder and runner get the deny-only model.
+- Legacy mode preserves the upstream Gateway model catalog, builder, and runner.
+- New sessions bind their mode in Eve state. A changed mode rejects continuation. Start a new conversation.
+- A session from before modes existed binds to legacy on its first step when legacy is configured.
+- Existing conversations and immutable versions do not change destination.
+- Runner sessions in legacy mode use the model stored on their deployed version.
+- Settings show local limits in local mode and the original catalog in legacy mode.
+- The verified Ollama versions live in `lib/inference/config.ts`, nowhere else.
 
 ## Pictures are copied, never linked
 
@@ -302,6 +305,10 @@ the backend factory** so it cannot be forgotten per session. Costs nothing —
 credentials and network is exfiltration-shaped; with neither it is a text processor.
 
 ## Team-agent builder and runner
+
+Both specialists remain in Eve discovery for explicit `LEGACY_GATEWAY` mode.
+Local mode returns a deny-only model for both specialists.
+The fixed sales extraction workflow remains the supported local business path.
 
 `agent_builder` and `agent_runner` are declared subagents with independent
 instructions, tools and deny-all sandboxes. They inherit nothing from the root. The
