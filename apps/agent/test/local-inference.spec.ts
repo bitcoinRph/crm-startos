@@ -246,10 +246,10 @@ describe("local inference", () => {
 			],
 		};
 		await expect(inference.model.doGenerate(input)).rejects.toThrow(
-			"LOCAL_INFERENCE_UNAVAILABLE",
+			"INFERENCE_UNAVAILABLE",
 		);
 		await expect(inference.model.doStream(input)).rejects.toThrow(
-			"LOCAL_INFERENCE_UNAVAILABLE",
+			"INFERENCE_UNAVAILABLE",
 		);
 		expect(calls).toBe(0);
 	});

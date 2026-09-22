@@ -17,20 +17,19 @@ test("legacy builder and runner remain in Eve discovery", () => {
 	);
 });
 
-test("local specialists fail closed while legacy mode remains explicit", () => {
+test("local mode denies every role and legacy mode stays explicit", () => {
 	const model = source("agent/lib/model.ts");
 	expect(model).toContain('configuredMode() !== "LEGACY_GATEWAY"');
-	expect(model).toContain('if (mode === "LOCAL") return role === "root"');
-	expect(model).toContain('if (role !== "root") return deniedSelection()');
+	expect(model).toContain('!== "LEGACY_GATEWAY") return null');
+	expect(model).toContain('if (decision === "deny") return deniedSelection()');
 	expect(model).toContain("unavailableModel()");
+	expect(model).not.toContain("routing");
 });
 
-test("mode and route changes require a new session", () => {
+test("a mode change requires a new session", () => {
 	const mode = source("agent/lib/inference/mode.ts");
-	const routing = source("agent/lib/inference/routing.ts");
 	expect(mode).toContain("INFERENCE_MODE_CHANGED");
-	expect(routing).toContain("LOCAL_INFERENCE_ROUTE_CHANGED");
-	expect(routing).not.toContain("Gateway");
+	expect(mode).not.toContain("Gateway");
 });
 
 test("builder versions use the explicit legacy selection", () => {

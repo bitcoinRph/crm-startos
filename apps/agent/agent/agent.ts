@@ -3,7 +3,7 @@ import "@crm/env/load";
 import { onTelemetryProblem, syncVersion } from "@crm/telemetry";
 import { defineAgent } from "eve";
 import { logCapabilities } from "./lib/capabilities";
-import { LOCAL_INFERENCE } from "./lib/inference/local";
+import { LOCAL_INFERENCE } from "./lib/inference/config";
 import { inferenceModel } from "./lib/model";
 
 void logCapabilities();

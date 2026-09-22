@@ -1,6 +1,6 @@
 import { defineAgent } from "eve";
 import { z } from "zod";
-import { LOCAL_INFERENCE } from "../../lib/inference/local";
+import { LOCAL_INFERENCE } from "../../lib/inference/config";
 import { inferenceModel } from "../../lib/model";
 
 export default defineAgent({

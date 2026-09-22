@@ -15,13 +15,15 @@ The operator selects `LOCAL` or `LEGACY_GATEWAY` through `CRM_INFERENCE_MODE`.
 See `docs/local-inference.md` for the complete mode and session contract.
 
 - Missing or invalid mode configuration disables inference, not CRM startup.
-- Local mode uses the guarded local adapter and never falls back to Gateway.
+- Local mode runs only the fixed sales extraction (`lib/sales-extraction.ts`) through the guarded local adapter and never falls back to Gateway.
+- In local mode the research chat, builder and runner get the deny-only model.
 - Legacy mode preserves the upstream Gateway model catalog, builder, and runner.
-- New sessions bind their mode and local route identity in Eve state.
-- Changed modes or local routes reject continuation. Start a new conversation.
+- New sessions bind their mode in Eve state. A changed mode rejects continuation. Start a new conversation.
+- A session from before modes existed binds to legacy on its first step when legacy is configured.
 - Existing conversations and immutable versions do not change destination.
 - Runner sessions in legacy mode use the model stored on their deployed version.
 - Settings show local limits in local mode and the original catalog in legacy mode.
+- The verified Ollama versions live in `lib/inference/config.ts`, nowhere else.
 
 ## Pictures are copied, never linked
 

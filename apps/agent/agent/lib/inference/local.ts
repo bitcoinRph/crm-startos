@@ -2,13 +2,11 @@ import { createHash } from "node:crypto";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { z } from "zod";
-
-export const LOCAL_INFERENCE = {
-	contextWindowTokens: 4096,
-	profile: "ollama-0.34.0-no-thinking-verified-context-v2",
-	maxOutputTokens: 1024,
-	requestTimeoutMs: 120_000,
-} as const;
+import {
+	isVerifiedRunnerVersion,
+	LOCAL_INFERENCE,
+	unverifiedRunnerVersion,
+} from "./config";
 
 function allowedLocalHosts(): Set<string> {
 	return new Set([
@@ -87,12 +85,12 @@ export function unavailableModel(): LanguageModelV4 {
 		supportedUrls: {},
 		doGenerate: async () => {
 			throw new Error(
-				"LOCAL_INFERENCE_UNAVAILABLE: Configure local inference and start a new conversation.",
+				"INFERENCE_UNAVAILABLE: No model is available to this conversation in the current inference mode. Start a new conversation.",
 			);
 		},
 		doStream: async () => {
 			throw new Error(
-				"LOCAL_INFERENCE_UNAVAILABLE: Configure local inference and start a new conversation.",
+				"INFERENCE_UNAVAILABLE: No model is available to this conversation in the current inference mode. Start a new conversation.",
 			);
 		},
 	};
@@ -128,9 +126,11 @@ export function createLocalInference(
 			if (!response.ok) throw new Error("LOCAL_INFERENCE_VERIFICATION_FAILED");
 			const data = await response.json();
 			if (path === "/api/version") {
-				if (z.object({ version: z.literal("0.34.0") }).safeParse(data).success)
-					continue;
-				throw new Error("LOCAL_INFERENCE_VERSION_UNVERIFIED");
+				const { version } = z.object({ version: z.string() }).parse(data);
+				if (isVerifiedRunnerVersion(version)) continue;
+				throw new Error(
+					`LOCAL_INFERENCE_VERSION_UNVERIFIED: ${unverifiedRunnerVersion(version)}`,
+				);
 			}
 			const selected = runnerState
 				.parse(data)

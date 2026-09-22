@@ -64,16 +64,19 @@ test("missing, smaller, malformed or ambiguous runner allocation denies both met
 });
 
 test("unknown version and failed verification fail closed", async () => {
-	for (const response of [
-		Response.json({ version: "0.33.0" }),
-		new Response("down", { status: 503 }),
-	]) {
+	for (const [response, message] of [
+		[Response.json({ version: "0.35.0" }), "Ollama 0.35.0 is not a verified"],
+		[
+			new Response("down", { status: 503 }),
+			"LOCAL_INFERENCE_VERIFICATION_FAILED",
+		],
+	] as const) {
 		const urls: string[] = [];
 		const { model } = createLocalInference(config, async (url) => {
 			urls.push(String(url));
 			return response.clone();
 		});
-		await expect(model.doGenerate(input)).rejects.toThrow();
+		await expect(model.doGenerate(input)).rejects.toThrow(message);
 		expect(urls).toEqual(["http://127.0.0.1:11434/api/version"]);
 	}
 });

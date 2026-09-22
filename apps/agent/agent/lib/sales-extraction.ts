@@ -1,8 +1,12 @@
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import {
-	createLocalInference,
+	isVerifiedRunnerVersion,
 	LOCAL_INFERENCE,
+	unverifiedRunnerVersion,
+} from "./inference/config";
+import {
+	createLocalInference,
 	parseLocalConfig,
 	selectionIdentity,
 } from "./inference/local";
@@ -128,9 +132,13 @@ async function localModel(
 			throw new Error("SALES_WARMUP_FAILED");
 		return response.json();
 	};
-	z.object({ version: z.literal("0.34.0") }).parse(
-		await native("/api/version"),
-	);
+	const { version } = z
+		.object({ version: z.string() })
+		.parse(await native("/api/version"));
+	if (!isVerifiedRunnerVersion(version))
+		throw new Error(
+			`SALES_RUNNER_VERSION_UNVERIFIED: ${unverifiedRunnerVersion(version)}`,
+		);
 	const installed = z
 		.object({ models: z.array(z.object({ name: z.string() })) })
 		.parse(await native("/api/tags"));

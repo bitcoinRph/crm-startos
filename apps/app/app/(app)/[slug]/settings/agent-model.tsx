@@ -87,8 +87,9 @@ function LocalAgentModel({ enabled }: { enabled: boolean }) {
 			</CardHeader>
 			<CardContent>
 				<p>
-					Local mode supports the fixed sales extraction workflow. Agent
-					builder, runner, model catalog, Codex, and OpenWebUI are unavailable.
+					Local mode runs the fixed sales extraction workflow only. The research
+					chat, agent builder, runner, model catalog, Codex, and OpenWebUI are
+					unavailable in this mode.
 				</p>
 				<p>
 					Configuration changes require a new conversation. Local failures never

@@ -2,18 +2,13 @@ import { db } from "@crm/db";
 import { DEFAULT_AGENT_MODEL, readAgentModel } from "@crm/db/settings";
 import { type DynamicResolveContext, defineDynamic } from "eve";
 import { defineState } from "eve/context";
-import {
-	createLocalInference,
-	parseLocalConfig,
-	selectionIdentity,
-	unavailableModel,
-} from "./inference/local";
+import { createLocalInference, unavailableModel } from "./inference/local";
 import {
 	bindInferenceMode,
 	type InferenceMode,
 	modeFromEnvironment,
+	stepDecision,
 } from "./inference/mode";
-import { createLocalRouting } from "./inference/routing";
 import { attribute, purposeOf } from "./session-purpose";
 
 export interface ModelSelection {
@@ -24,18 +19,12 @@ export interface ModelSelection {
 type ModelRole = "root" | "builder" | "runner";
 type InferenceContext = Pick<DynamicResolveContext, "session">;
 
-const inferenceState = defineState("crm.inference-mode.v2", () => ({
+const inferenceState = defineState("crm.inference-mode.v3", () => ({
 	mode: null as InferenceMode | null,
-	identity: null as string | null,
-	rootSessionId: null as string | null,
 }));
 
 function configuredMode(): InferenceMode {
 	return modeFromEnvironment(process.env.CRM_INFERENCE_MODE);
-}
-
-function configuredLocalModel() {
-	return parseLocalConfig(process.env.CRM_LOCAL_INFERENCE_JSON);
 }
 
 function deniedSelection() {
@@ -104,75 +93,32 @@ export async function versionModel() {
 	};
 }
 
-export async function initializeInferenceSession(
-	ctx: InferenceContext,
-	isRoot = false,
-) {
+export function initializeInferenceSession(): InferenceMode {
 	const current = inferenceState.get();
 	const bound = bindInferenceMode(current, configuredMode());
-	if (current.mode !== null) return;
-	const config = bound.mode === "LOCAL" ? configuredLocalModel() : null;
-	inferenceState.update(() => ({
-		...bound,
-		identity: config ? selectionIdentity(config) : null,
-		rootSessionId: isRoot ? ctx.session.id : null,
-	}));
+	if (current.mode === null) inferenceState.update(() => bound);
+	return bound.mode;
 }
 
 export function inferenceModel(role: ModelRole = "root") {
-	const state = {
-		get: () => inferenceState.get().identity,
-		set: (identity: string | null) =>
-			inferenceState.update((current) => ({ ...current, identity })),
-	};
-	const localRouting = (ctx: InferenceContext) =>
-		createLocalRouting(
-			state,
-			configuredLocalModel,
-			async (identity) => {
-				if (purposeOf(ctx) !== "team-agent") return true;
-				const runId = attribute(ctx, "runId");
-				if (!runId) return false;
-				const run = await db.agentRun.findUnique({
-					where: { id: runId },
-					select: {
-						version: {
-							select: { modelId: true, modelContextWindowTokens: true },
-						},
-					},
-				});
-				const config = configuredLocalModel();
-				return (
-					run?.version.modelId === identity &&
-					run.version.modelContextWindowTokens === config?.contextWindowTokens
-				);
-			},
-			() =>
-				role === "root" &&
-				inferenceState.get().rootSessionId === ctx.session.id,
-		);
+	const legacySelection = async (ctx: InferenceContext) =>
+		role === "runner"
+			? ((await pinnedRunnerModel(ctx)) ?? deniedSelection())
+			: selectedLegacyModel();
 
 	return defineDynamic({
 		fallback: unavailableModel(),
 		events: {
 			"session.started": async (_event, ctx) => {
-				await initializeInferenceSession(ctx);
-				const mode = inferenceState.get().mode;
-				if (mode === "DISABLED") return deniedSelection();
-				if (mode === "LOCAL") return role === "root" ? null : deniedSelection();
-				if (role === "runner")
-					return (await pinnedRunnerModel(ctx)) ?? deniedSelection();
-				return selectedLegacyModel();
+				if (initializeInferenceSession() !== "LEGACY_GATEWAY") return null;
+				return legacySelection(ctx);
 			},
-			"step.started": (_event, ctx) => {
-				try {
-					bindInferenceMode(inferenceState.get(), configuredMode());
-				} catch {
-					return deniedSelection();
-				}
-				if (inferenceState.get().mode !== "LOCAL") return null;
-				if (role !== "root") return deniedSelection();
-				return localRouting(ctx).step();
+			"step.started": async (_event, ctx) => {
+				const decision = stepDecision(inferenceState.get(), configuredMode());
+				if (decision === "keep") return null;
+				if (decision === "deny") return deniedSelection();
+				inferenceState.update(() => ({ mode: "LEGACY_GATEWAY" }));
+				return legacySelection(ctx);
 			},
 		},
 	});
