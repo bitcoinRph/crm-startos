@@ -8,6 +8,8 @@ import {
 import { setBuilderConversationTitle } from "../agent/lib/conversation-title";
 import { builderToken } from "../agent/lib/custom-agent-dispatch";
 
+const originalLocalConfig = process.env.CRM_LOCAL_INFERENCE_JSON;
+const originalInferenceMode = process.env.CRM_INFERENCE_MODE;
 const suffix = crypto.randomUUID();
 const userId = `builder-runtime-user-${suffix}`;
 let conversationId = "";
@@ -15,6 +17,13 @@ let agentId = "";
 const conversationIds: string[] = [];
 
 beforeAll(async () => {
+	process.env.CRM_INFERENCE_MODE = "LEGACY_GATEWAY";
+	process.env.CRM_LOCAL_INFERENCE_JSON = JSON.stringify({
+		baseURL: "http://127.0.0.1:9/v1",
+		modelId: "synthetic:fixture",
+		contextWindowTokens: 8192,
+		maxOutputTokens: 1024,
+	});
 	await db.user.create({
 		data: {
 			id: userId,
@@ -35,6 +44,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+	if (originalInferenceMode === undefined)
+		delete process.env.CRM_INFERENCE_MODE;
+	else process.env.CRM_INFERENCE_MODE = originalInferenceMode;
+	if (originalLocalConfig === undefined)
+		delete process.env.CRM_LOCAL_INFERENCE_JSON;
+	else process.env.CRM_LOCAL_INFERENCE_JSON = originalLocalConfig;
 	const agentIds = (
 		await db.agentDefinition.findMany({
 			where: { createdById: userId },

@@ -53,6 +53,18 @@ const dict = {
   'Research Agent': 49,
   'The research agent is ready': 50,
   'The research agent is not ready': 51,
+  'Configure Local Inference': 52,
+  'Connect the research agent to a local model server instead of the cloud gateway. The server must already be running and the model pre-loaded. No cloud fallback exists.': 53,
+  'Local inference endpoint': 54,
+  'HTTP(S) URL to an OpenAI-compatible local inference server. Only ollama.embassy, localhost, 127.0.0.1 and [::1] are allowed. No credentials or query parameters.': 55,
+  'Must be an approved local /v1 endpoint without credentials or query parameters.': 56,
+  'Model ID': 57,
+  'The model identifier passed to the local server. Exact match required. No spaces.': 58,
+  'Model ID must start with a letter or number and contain only letters, numbers, dots, underscores, colons, slashes and hyphens.': 59,
+  'Context window tokens': 60,
+  'The exact context window size the runner allocates. Must be 4096 for the verified Qwen profile.': 61,
+  'Max output tokens': 62,
+  'Maximum tokens the model will generate per response. Must be between 1 and 1024.': 63,
 } as const
 
 /**

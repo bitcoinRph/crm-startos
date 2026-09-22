@@ -6,6 +6,30 @@ export type McpTool = {
 
 export const MCP_TOOLS: readonly McpTool[] = [
 	{
+		name: "sales_create_request",
+		procedure: "sales.createRequest",
+		description:
+			"Queue a sales extraction for one explicit contact. Requires sales proposal write permission.",
+	},
+	{
+		name: "sales_get_request",
+		procedure: "sales.getRequest",
+		description: "Read a sales extraction request and its proposal.",
+	},
+	{
+		name: "sales_pending_requests",
+		procedure: "sales.pendingRequests",
+		description:
+			"Read pending sales extraction requests. Requires explicit CRM read or sales read permission.",
+	},
+	{
+		name: "sales_store_proposal",
+		procedure: "sales.storeProposal",
+		description:
+			"Store source-backed sales operations without applying them. Requires sales proposal write permission.",
+	},
+
+	{
 		name: "search_crm",
 		procedure: "search.quick",
 		description:

@@ -6,6 +6,9 @@ export const apiKeyListInput = listInput;
 
 export const createApiKeyInput = z.object({
 	name: z.string().trim().min(1).max(64),
+	profile: z
+		.enum(["crm_integration", "hermes_sales"])
+		.default("crm_integration"),
 	expiresInDays: z
 		.number()
 		.int()

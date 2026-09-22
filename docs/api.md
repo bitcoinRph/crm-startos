@@ -67,20 +67,17 @@ here, what do we sell.
 
 ### Gates in `proxy.ts`
 
-Onboarding, then `/onboarding/research` for the Context key. Asked server-side every
-request.
+Workspace onboarding runs before ordinary CRM navigation. Context research remains optional.
 
 - **`getSessionCookie()` decides signed-in**; pages still resolve the real session via
   `requireMailboxAccess()`.
 - **Nothing is cached in a cookie** — both facts revert on a database reset while a
   year-long marker insists the gate passed. Cache in the API if cost ever matters.
-- **Both reads run concurrently**, but order decides which is *asked* — the research
-  read is never made while onboarding is open.
+- The proxy reads workspace onboarding only. It does not query research-key status.
 - **An unreachable API fails open** (`unknown` lets the request through).
 - **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` is the only path a
   stranger may read; `/` joins it only when `IS_MARKETING` is set.
-- **There is no way past the key gate but to answer** — Skip stranded installs, every
-  later company sitting `PENDING` with nothing saying so.
+- The retired research onboarding route redirects to the CRM. Configure optional research from Settings.
 
 ### The name is also the URL
 
@@ -188,6 +185,21 @@ middlewares as the app. It is a wire format, not a second data surface.
 - **Not every procedure belongs in the list.** Bulk operations, purges, API-key
   management, SSO and tracking settings stay out. Adding a tool is one entry in
   `mcp-tools.ts`; adding a destructive one is a review question.
+
+### API-key compatibility and scopes
+
+New keys use an explicit profile.
+`crm_integration` grants only `crm:read` and `crm:write`.
+`hermes_sales` grants `crm:read`, `sales:read`, and `sales:proposal:write`.
+Sales approval always requires a human session.
+Sales reads and proposal writes always require their explicit scope.
+Scoped keys never receive permissions that are absent from the stored key.
+
+Keys created before scoped profiles have no stored permission object.
+These legacy member keys keep baseline non-sales query and mutation behavior.
+This compatibility path prevents an unannounced integration outage.
+Operators must replace legacy keys with scoped profiles before a future removal.
+API-key management remains outside MCP.
 
 ## Two mail providers, one pipeline
 

@@ -22,10 +22,6 @@ const workspaceAnswer = z
 	})
 	.catch({ onboarded: null, canRename: null, slug: null });
 
-const researchKeyAnswer = z
-	.object({ configured: z.boolean().nullable().catch(null) })
-	.catch({ configured: null });
-
 async function read(request: NextRequest, procedure: string) {
 	const cookie = request.headers.get("cookie");
 
@@ -66,14 +62,4 @@ export async function readWorkspaceGate(
 				: "required",
 		slug,
 	};
-}
-
-export async function readResearchGate(request: NextRequest): Promise<Gate> {
-	const { configured } = researchKeyAnswer.parse(
-		await read(request, "settings.researchKey"),
-	);
-
-	if (configured === null) return "unknown";
-
-	return configured ? "settled" : "required";
 }

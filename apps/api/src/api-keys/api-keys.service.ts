@@ -34,6 +34,11 @@ const KEY_SELECT = {
 
 type KeyRow = Prisma.ApikeyGetPayload<{ select: typeof KEY_SELECT }>;
 
+const KEY_PERMISSIONS = {
+	crm_integration: { crm: ["read", "write"] },
+	hermes_sales: { crm: ["read"], sales: ["read", "proposal:write"] },
+} satisfies Record<CreateApiKeyInput["profile"], Record<string, string[]>>;
+
 const SORTABLE: OrderByColumns<Prisma.ApikeyOrderByWithRelationInput> = {
 	name: (dir) => ({ name: dir }),
 	createdAt: (dir) => ({ createdAt: dir }),
@@ -99,6 +104,7 @@ export class ApiKeysService {
 				headers,
 				body: {
 					name: input.name,
+					permissions: KEY_PERMISSIONS[input.profile],
 					expiresIn:
 						input.expiresInDays === null
 							? null

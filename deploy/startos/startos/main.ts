@@ -66,6 +66,15 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const optional = (name: string, value: string) =>
     value ? { [name]: value } : {}
 
+  const inferenceMode = store.agent.localInference
+    ? 'LOCAL'
+    : store.agent.aiGatewayApiKey
+      ? 'LEGACY_GATEWAY'
+      : 'DISABLED'
+  const localInferenceHost = store.agent.localInference
+    ? new URL(store.agent.localInference.baseURL).hostname
+    : ''
+
   const env = {
     NODE_ENV: 'production',
     DATABASE_URL: databaseUrl,
@@ -78,6 +87,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
     AGENT_URL: `http://127.0.0.1:${agentPort}`,
     AGENT_BRIDGE_SECRET: store.bridgeSecret,
     CRON_SECRET: store.cronSecret,
+    CRM_INFERENCE_MODE: inferenceMode,
+    ...optional('CRM_LOCAL_INFERENCE_ALLOWED_HOSTS', localInferenceHost),
     NEXT_TELEMETRY_DISABLED: '1',
     ...(store.agent.telemetry ? {} : { CRM_TELEMETRY_DISABLED: '1' }),
     ...google,
@@ -86,6 +97,11 @@ export const main = sdk.setupMain(async ({ effects }) => {
     ...optional('PERPLEXITY_API_KEY', store.agent.perplexityApiKey),
     ...optional('GITHUB_TOKEN', store.agent.githubToken),
     ...optional('BLOB_READ_WRITE_TOKEN', store.agent.blobToken),
+    ...(store.agent.localInference
+      ? {
+          CRM_LOCAL_INFERENCE_JSON: JSON.stringify(store.agent.localInference),
+        }
+      : {}),
   }
 
   const postgresSub = sdk.SubContainer.of(

@@ -124,24 +124,33 @@ single place that knows what is set.
 | `PERPLEXITY_API_KEY` | Open-web research with citations; finds a LinkedIn slug |
 | `GITHUB_TOKEN` | Raises the GitHub rate limit from 60/hour |
 | `BLOB_READ_WRITE_TOKEN` | Mirrors logos and photos into Blob |
-| `AI_GATEWAY_API_KEY` | The model. Not needed on Vercel (OIDC) |
+| `CRM_INFERENCE_MODE` | Explicit `LOCAL` or `LEGACY_GATEWAY` selection |
+| `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS` | Comma-separated non-loopback hosts allowed in local mode |
+| `CRM_LOCAL_INFERENCE_JSON` | Operator-managed local profile; see `local-inference.md` |
 | `AGENT_BRIDGE_SECRET` | The rep-facing Agent panel — see `agent.md` |
 
 `BLOB_READ_WRITE_TOKEN` is also in `env.validation.ts` and `apps/api/turbo.json`
 because the API and the seed write pictures too. The Next.js app is deliberately
 excluded — recognising our URL for the image optimizer needs no token.
 
-### The Context key is asked for, not configured
+### Local inference
+
+All inference variables configure the agent process only.
+Deployment administrators control these values.
+The API and browser do not accept mode or endpoint changes.
+An empty mode disables inference.
+See `docs/local-inference.md`.
+
+### The Context key is optional
 
 **`CONTEXT_DEV_API_KEY` is not a variable here and must not become one.** The key lives
-in `AppSetting`, is asked for at `/onboarding/research`, and changes on Settings →
-General — an admin who cannot redeploy cannot set a variable.
+in `AppSetting` and changes on Settings → General. Research is optional.
+Workspace onboarding opens the CRM without a Context key.
 
 - **It buys two places to look, not one.** Company brand data by domain, and a person
   read back from a LinkedIn URL already on their record. Both capabilities in
   `agent/lib/capabilities.ts` turn on and off with this one key.
-- **An install that had the variable is asked again**: no migration, no fallback, and
-  **the gate cannot be dismissed**.
+- No research-key gate blocks ordinary CRM access. Local inference does not supply external research sources.
 - **Nothing is lost while waiting.** A keyless `brand` task settles `SKIPPED` *before*
   anything marks the row `RUNNING`, and `settle` only overwrites `RUNNING` — so the
   company stays `PENDING`, which the sweep re-queues

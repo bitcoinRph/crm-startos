@@ -67,7 +67,39 @@ function byProvider(models: CatalogModel[]): [string, CatalogModel[]][] {
 	return [...groups];
 }
 
-export function AgentModel() {
+export type AgentModelMode = "LOCAL" | "LEGACY_GATEWAY" | "DISABLED";
+
+export function AgentModel({ mode }: { mode: AgentModelMode }) {
+	if (mode === "LEGACY_GATEWAY") return <LegacyAgentModel />;
+	return <LocalAgentModel enabled={mode === "LOCAL"} />;
+}
+
+function LocalAgentModel({ enabled }: { enabled: boolean }) {
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Local inference</CardTitle>
+				<CardDescription>
+					{enabled
+						? "The deployment administrator selected the bounded local profile."
+						: "Inference is disabled until the deployment administrator selects a mode."}
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<p>
+					Local mode supports the fixed sales extraction workflow. Agent
+					builder, runner, model catalog, Codex, and OpenWebUI are unavailable.
+				</p>
+				<p>
+					Configuration changes require a new conversation. Local failures never
+					fall back to a cloud model.
+				</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function LegacyAgentModel() {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const [open, setOpen] = useState(false);

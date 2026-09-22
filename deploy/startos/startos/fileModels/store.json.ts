@@ -22,6 +22,40 @@ const agentShape = z.object({
   githubToken: z.string().catch(''),
   blobToken: z.string().catch(''),
   telemetry: z.boolean().catch(false),
+  localInference: z
+    .object({
+      baseURL: z
+        .string()
+        .url()
+        .refine((value) => {
+          const url = new URL(value)
+          return (
+            ['http:', 'https:'].includes(url.protocol) &&
+            ['ollama.embassy', 'localhost', '127.0.0.1', '[::1]'].includes(
+              url.hostname,
+            ) &&
+            !url.username &&
+            !url.password &&
+            !url.search &&
+            !url.hash &&
+            url.pathname === '/v1' &&
+            value === url.href
+          )
+        }, 'Use an approved local /v1 endpoint without credentials or query parameters.'),
+      modelId: z
+        .string()
+        .min(1)
+        .max(200)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/),
+      contextWindowTokens: z
+        .number()
+        .int()
+        .refine((value) => value === 4096),
+      maxOutputTokens: z.number().int().min(1).max(1024),
+    })
+    .strict()
+    .refine((value) => value.maxOutputTokens < value.contextWindowTokens)
+    .optional(),
 })
 
 const shape = z.object({
