@@ -122,6 +122,17 @@ describe("API key access policy", () => {
 		);
 	});
 
+	it("delegates every sales procedure to the sales scopes", () => {
+		for (const key of [legacy, scoped(KEY_PERMISSIONS.crm_integration)]) {
+			expect(authorizeApiKeyProcedure(key, "sales.getRequest", "query")).toBe(
+				"sales",
+			);
+			expect(
+				authorizeApiKeyProcedure(key, "sales.approveProposal", "mutation"),
+			).toBe("sales");
+		}
+	});
+
 	it("denies every key access to API key management", () => {
 		for (const key of [
 			legacy,

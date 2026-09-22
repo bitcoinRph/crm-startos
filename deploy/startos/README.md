@@ -90,14 +90,14 @@ One volume, `main`:
 | `agent/sandbox-cache/` | `/app/apps/agent/.eve/sandbox-cache` in `crm` | The agent's just-bash sandbox filesystem |
 | `store.json` | not mounted; read by the package | Generated secrets, the sign-in and agent configuration, the password account |
 
-`store.json` holds `postgresPassword`, `authSecret` (`BETTER_AUTH_SECRET`), `bridgeSecret` (`AGENT_BRIDGE_SECRET`), `cronSecret` (`CRON_SECRET`), `admin` (email and password of the password account), `signIn` and `agent` (the two configure actions).
+`store.json` holds `postgresPassword`, `authSecret` (`BETTER_AUTH_SECRET`), `bridgeSecret` (`AGENT_BRIDGE_SECRET`), `cronSecret` (`CRON_SECRET`), `admin` (email and password of the password account), `signIn` and `agent` (research-agent and local-inference configuration).
 
 ## Installation and First-Run Flow
 
 1. On install, `seedSecrets` generates the four secrets above.
 2. `watchAdminCredentials` raises a critical task pointing at **Set Sign-in Credentials** while no password account is stored. The service cannot start until it is run.
 3. On every start `main.ts` composes the environment from the store and the service's own addresses, runs the migrations, applies the password account, then starts the API, the app, the agent and the scheduler.
-4. The first person to sign in becomes the workspace owner, as upstream; the web app then runs its own onboarding (workspace name, website, Context key).
+4. The first person to sign in becomes the workspace owner, as upstream; the web app then runs its own onboarding for the workspace name and website.
 
 There is no seed data. Upstream's `dev:session` script is not used.
 
@@ -108,7 +108,7 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | `ALLOWED_SIGN_IN` (allow-list plus the credentials email) | Workspace name, website, members and roles |
 | `API_URL` (the public URL) and `APP_URL` (every non-local address of the Web UI) | Agent model, Context key, archive retention (Settings → General) |
 | Google and Microsoft OAuth clients, Microsoft tenant | SSO providers (Settings → SSO), API keys (Settings → API keys) |
-| `AI_GATEWAY_API_KEY`, `PERPLEXITY_API_KEY`, `GITHUB_TOKEN`, `BLOB_READ_WRITE_TOKEN`, telemetry | Slack connection, tracking settings |
+| `AI_GATEWAY_API_KEY`, `CRM_INFERENCE_MODE`, `CRM_LOCAL_INFERENCE_JSON`, `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`, `PERPLEXITY_API_KEY`, `GITHUB_TOKEN`, `BLOB_READ_WRITE_TOKEN`, telemetry | Slack connection, tracking settings |
 | `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, all four secrets, `NODE_ENV=production` | — |
 
 `APP_URL` is recomputed whenever the service's addresses change, so a new domain or a disabled gateway restarts the service with the right trusted origins. `API_URL` is the **Public URL** from **Configure Sign-in**, or else the first public address, or else the first address of the Web UI.
@@ -128,13 +128,20 @@ Both interfaces share one binding; the app proxies `/api/*` to the API, so the M
 | --- | --- | --- | --- | --- |
 | Set Sign-in Credentials (`set-admin-credentials`) | Create or reset the password account; also surfaced as the install task | Any status; visible | Email; optional password (generated when empty) | Email and password, once |
 | Configure Sign-in (`configure-sign-in`) | Allow-list, public URL, Google and Microsoft OAuth clients | Any status; visible | Text fields, secrets masked | — |
-| Configure Research Agent (`configure-agent`) | AI Gateway, Perplexity, GitHub and Vercel Blob keys; telemetry switch | Any status; visible | Text fields, secrets masked; toggle | — |
+| Configure Research Agent (`configure-agent`) | Explicit legacy Gateway mode plus optional Perplexity, GitHub and Vercel Blob keys; telemetry switch | Any status; visible | Text fields, secrets masked; toggle | — |
+| Configure Local Inference (`configure-local-inference`) | Run the agent on the Ollama service installed on this server | Any status; visible | Model ID (empty turns local inference off) and max output tokens | — |
 
 Every action writes `store.json`; `main.ts` reads the store with `.const()`, so a change restarts the service.
 
 ## Backups and Restore
 
 `sdk.Backups.withPgDump` dumps the `crm` database with `pg_dump` and restores it with `pg_restore` into a fresh cluster. The rest of the `main` volume is rsynced with `postgresql/` excluded, so `store.json` and the agent's workflow data travel with the backup.
+
+**Backup path:** `pgdataPath` is set to `/postgresql/data` because the runtime cluster lives at `main/postgresql/data` under `PGDATA=/var/lib/postgresql/data`. Disposable restore tests are not performed on this branch; use a disposable StartOS instance with synthetic data before production restore.
+
+## Local inference
+
+**Configure Local Inference** stores `modelId` and `maxOutputTokens` in `store.json` under `agent.localInference`. The endpoint is never an input: when a model is set, `dependencies.ts` requires the `ollama` package (`>=0.34.0:0`, health check `primary`) and `main.ts` resolves its bridge address with `sdk.host.getBridgeAddress(effects, { packageId: 'ollama', hostId: 'api-multi', internalPort: 11434 })`, which is the only route from this container to another package (`10.0.3.1:<assigned port>`; `.embassy` and loopback names do not reach it). `main.ts` then selects `LOCAL`, passes `CRM_LOCAL_INFERENCE_JSON` with `baseURL: http://<bridge>/v1` and the fixed 4096-token context, and allow-lists the bridge host in `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`. If a model is set and Ollama is not reachable, `main.ts` throws and the service shows the error instead of starting with a dead endpoint; `.const()` re-runs it when the address changes. Local configuration takes precedence over a stored Gateway key and never falls back to cloud inference. Without a model, a configured Gateway key selects explicit `LEGACY_GATEWAY`; with neither, inference is disabled.
 
 ## Health Checks
 
@@ -148,13 +155,17 @@ Every action writes `store.json`; `main.ts` reads the store with `.const()`, so 
 
 ## Dependencies
 
-None.
+| Package | Kind | When | Why |
+| --- | --- | --- | --- |
+| `ollama` (Start9's [ollama-startos](https://github.com/Start9Labs/ollama-startos)) | Optional; `running`, `>=0.34.0:0`, health check `primary` | Only while **Configure Local Inference** names a model | Serves the local model over its `api-multi` binding on port 11434; reached through the bridge address |
+
+Pull the model inside the Ollama service before naming it here (`ollama pull qwen3.5:4b`). The CRM does not download models.
 
 ## Limitations and Differences
 
 1. **Password sign-in exists here and not upstream.** `PASSWORD_SIGN_IN=true` enables Better Auth's email-and-password sign-in with sign-up disabled; `apps/api/scripts/local-account.ts` writes the account. Everything else about authorisation is upstream's: `ALLOWED_SIGN_IN` still decides who may have an account.
 2. **Google sign-in needs a public domain.** Google refuses `.local` redirect URIs. Set **Public URL** to a domain of this server; the Google and Microsoft callback paths are `/api/auth/callback/google` and `/api/auth/callback/microsoft` on that origin.
-3. **The model is remote.** The agent reaches its model only through the Vercel AI Gateway; there is no local-model option in the code. Email content the agent reads leaves the server when it researches. Without the key the agent boots and every research session fails.
+3. **Inference is operator-selected.** **Configure Local Inference** selects a verified local profile and never falls back to cloud inference. Without local configuration, a Vercel AI Gateway key selects explicit legacy mode. With neither configuration, inference stays disabled. Builder and runner workflows remain available only in legacy mode.
 4. **The agent's sandbox is just-bash.** No Docker and no microsandbox exist inside the service, so eve's `defaultBackend()` falls through to the pure-JavaScript interpreter: a virtual filesystem with no real binaries and no network.
 5. **Pictures need Vercel Blob.** Without `BLOB_READ_WRITE_TOKEN` contacts keep no photograph and logos are hotlinked, as upstream documents.
 6. **Telemetry is off by default** (`CRM_TELEMETRY_DISABLED=1`), the reverse of upstream. The toggle is in **Configure Research Agent**.
@@ -165,7 +176,7 @@ None.
 ## What Is Unchanged from Upstream
 
 - The web app, the API, the tRPC and REST surfaces, the OpenAPI document and Swagger UI.
-- The research agent: its tools, skills, dispatch schedule, evidence model and the Agent tab.
+- The research agent's tools, skills, dispatch schedule, evidence model and Agent tab. Its model route follows the selected inference mode.
 - Google and Microsoft mailbox sync, Slack connection, website tracking, custom fields, saved views, currencies.
 - API keys (Settings → API keys) and the `x-api-key` header; the MCP endpoint reuses them.
 - Onboarding, workspace roles, SSO providers added from Settings.
@@ -200,6 +211,9 @@ startos_managed_env_vars:
   - AGENT_BRIDGE_SECRET
   - CRON_SECRET
   - CRM_TELEMETRY_DISABLED
+  - CRM_INFERENCE_MODE
+  - CRM_LOCAL_INFERENCE_ALLOWED_HOSTS
+  - CRM_LOCAL_INFERENCE_JSON
   - GOOGLE_CLIENT_ID
   - GOOGLE_CLIENT_SECRET
   - MICROSOFT_CLIENT_ID
@@ -213,6 +227,7 @@ actions:
   - set-admin-credentials
   - configure-sign-in
   - configure-agent
+  - configure-local-inference
 health_checks:
   - api: http://127.0.0.1:3001/health
   - app: port_listening 3000

@@ -6,7 +6,7 @@ export type VerifiedApiKey = {
 	permissions: ApiKeyPermissions | null;
 };
 
-export type ApiKeyDecision = "allow" | "deny";
+export type ApiKeyDecision = "allow" | "deny" | "sales";
 
 type HeaderValue = string | string[] | undefined;
 type HeaderMap = Record<string, HeaderValue>;
@@ -32,6 +32,7 @@ export function authorizeApiKeyProcedure(
 	path: string,
 	type: string,
 ): ApiKeyDecision {
+	if (path.startsWith("sales.")) return "sales";
 	if (path.startsWith("apiKeys.")) return "deny";
 	if (key.permissions === null) return "allow";
 	return permits(key.permissions, "crm", type === "query" ? "read" : "write")

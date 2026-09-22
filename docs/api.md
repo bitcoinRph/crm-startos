@@ -67,20 +67,17 @@ here, what do we sell.
 
 ### Gates in `proxy.ts`
 
-Onboarding, then `/onboarding/research` for the Context key. Asked server-side every
-request.
+Workspace onboarding runs before ordinary CRM navigation. Context research remains optional.
 
 - **`getSessionCookie()` decides signed-in**; pages still resolve the real session via
   `requireMailboxAccess()`.
 - **Nothing is cached in a cookie** — both facts revert on a database reset while a
   year-long marker insists the gate passed. Cache in the API if cost ever matters.
-- **Both reads run concurrently**, but order decides which is *asked* — the research
-  read is never made while onboarding is open.
+- The proxy reads workspace onboarding only. It does not query research-key status.
 - **An unreachable API fails open** (`unknown` lets the request through).
 - **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` is the only path a
   stranger may read; `/` joins it only when `IS_MARKETING` is set.
-- **There is no way past the key gate but to answer** — Skip stranded installs, every
-  later company sitting `PENDING` with nothing saying so.
+- The retired research onboarding route redirects to the CRM. Configure optional research from Settings.
 
 ### The name is also the URL
 
@@ -202,8 +199,10 @@ from the stored permissions, never from the request.
 | `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
 | `agent_read` | `crm:read` | Queries only |
 
-- **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales`
-  permissions are reserved for the proposal procedures and grant nothing else.
+- **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales.*`
+  procedures decide from the `sales` permissions instead (`sales/sales.auth.ts`):
+  a read needs `crm:read` or `sales:read`, a proposal needs
+  `sales:proposal:write`, and approval needs a human session, never a key.
 - **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
 - **A key created before profiles has no permissions and keeps full access.**
   The table shows it as *Legacy: full access* so the owner can rotate it.

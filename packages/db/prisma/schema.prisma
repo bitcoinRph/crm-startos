@@ -1553,6 +1553,52 @@ model SsoProvider {
   @@map("ssoProvider")
 }
 
+
+enum SalesRequestStatus {
+  PENDING
+  PROPOSED
+  APPROVED
+  FAILED
+}
+
+model SalesRequest {
+  id String @id @default(uuid()) @db.Uuid
+  idempotencyKey String @unique @default(uuid()) @db.Uuid
+  source String
+  contactId String
+  contactSnapshot Json
+  expectedUpdatedAt DateTime
+  profileId String
+  profileRevision String
+  requestedById String
+  requestedByKeyId String?
+  status SalesRequestStatus @default(PENDING)
+  error String?
+  createdAt DateTime @default(now())
+  proposal SalesProposal?
+
+  @@index([status, createdAt])
+  @@map("salesRequest")
+}
+
+model SalesProposal {
+  id String @id @default(uuid()) @db.Uuid
+  requestId String @unique @db.Uuid
+  request SalesRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  idempotencyKey String @unique @default(uuid()) @db.Uuid
+  operations Json
+  proposedById String?
+  proposedByKeyId String?
+  producedBy String?
+  createdAt DateTime @default(now())
+  approvedAt DateTime?
+  approvedById String?
+  approvedSessionId String?
+  appliedActivityIds String[] @default([])
+
+  @@map("salesProposal")
+}
+
 model Apikey {
   id                  String    @id
   configId            String    @default("default")

@@ -225,6 +225,7 @@ const contactDealOutput = z.object({
 
 export const contactByIdOutput = z.object({
 	id: z.string(),
+	updatedAt: z.string(),
 	firstName: z.string(),
 	lastName: z.string().nullable(),
 	email: z.string().nullable(),

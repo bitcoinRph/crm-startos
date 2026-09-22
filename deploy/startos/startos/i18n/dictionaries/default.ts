@@ -53,6 +53,13 @@ const dict = {
   'Research Agent': 49,
   'The research agent is ready': 50,
   'The research agent is not ready': 51,
+  'Configure Local Inference': 52,
+  'Run the research agent on the Ollama service installed on this server instead of the cloud gateway. Install Ollama from the marketplace, pull the model, then enter its ID here. Nothing falls back to the cloud.': 53,
+  'Model ID': 57,
+  'The model tag pulled in the Ollama service, for example qwen3.5:4b. Exact match. Leave empty to turn local inference off.': 58,
+  'Model ID must start with a letter or number and contain only letters, numbers, dots, underscores, colons, slashes and hyphens.': 59,
+  'Max output tokens': 62,
+  'Maximum tokens the model will generate per response. Must be between 1 and 1024.': 63,
 } as const
 
 /**

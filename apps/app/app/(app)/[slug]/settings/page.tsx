@@ -12,7 +12,7 @@ import {
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
-import { AgentModel } from "./agent-model";
+import { AgentModel, type AgentModelMode } from "./agent-model";
 import { ArchiveRetention } from "./archive-retention";
 import { ResearchKey } from "./research-key";
 import { WorkspaceForm } from "./workspace-form";
@@ -28,7 +28,7 @@ export default function GeneralSettingsPage() {
 				<PageShellHeading>
 					<PageShellTitle>General</PageShellTitle>
 					<PageShellDescription>
-						Who you are, and the model the research agent thinks with.
+						Your workspace, optional research, and inference setup.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>
@@ -44,14 +44,23 @@ export default function GeneralSettingsPage() {
 
 async function Settings() {
 	await requireSession();
+	const mode: AgentModelMode =
+		process.env.CRM_INFERENCE_MODE === "LOCAL" ||
+		process.env.CRM_INFERENCE_MODE === "LEGACY_GATEWAY"
+			? process.env.CRM_INFERENCE_MODE
+			: "DISABLED";
 
 	const trpc = getServerTrpc();
 	const queryClient = getServerQueryClient();
 
 	await Promise.all([
 		queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),
-		queryClient.prefetchQuery(trpc.settings.agentModel.queryOptions()),
-		queryClient.prefetchQuery(trpc.settings.modelCatalog.queryOptions()),
+		...(mode === "LEGACY_GATEWAY"
+			? [
+					queryClient.prefetchQuery(trpc.settings.agentModel.queryOptions()),
+					queryClient.prefetchQuery(trpc.settings.modelCatalog.queryOptions()),
+				]
+			: []),
 		queryClient.prefetchQuery(trpc.settings.researchKey.queryOptions()),
 		queryClient.prefetchQuery(trpc.settings.archiveRetention.queryOptions()),
 	]);
@@ -62,7 +71,7 @@ async function Settings() {
 				<WorkspaceForm />
 				<ResearchKey />
 				<ArchiveRetention />
-				<AgentModel />
+				<AgentModel mode={mode} />
 			</div>
 		</HydrateClient>
 	);
