@@ -507,35 +507,59 @@ Each step is one commit on `local-first-inference`, tests first, full
 Not planned unless you ask: root chat on the local model (D3), in-CRM
 extraction scheduler (D2b), Dockerfile non-root (N1), Codex OAuth.
 
+## 7. Status after Phase 3
+
+Decisions taken (approved by the owner): D1 password sign-in, D2 MCP path
+only, D3 root chat denied in `LOCAL`, D5 three PRs, D6 build egress accepted,
+D7 exact verified version list. D4 (architecture) is still open; CI builds both.
+
+| Finding | Where | Status |
+| --- | --- | --- |
+| B1 Ollama unreachable | PR #8 `feat(startos)` commit | Done: optional `ollama` dependency, bridge address, model-ID-only action |
+| B2 no production extractor | PR #8 `feat(api)` and docs | Done: MCP path is the supported path; worker moved to `test/e2e`; unattended extraction in `FOLLOWUPS.md` E |
+| B3 root chat in `LOCAL` | PR #8 `refactor(agent)` | Done: `LOCAL` denies every role; settings say so; `FOLLOWUPS.md` D |
+| B4 profile unreachable, framework-named | PR #11 | Done: `crm_integration`, `agent_propose`, `agent_read`; selector and table column |
+| S1 backup path | PR #10 | Done, separate PR |
+| S2 version literals | PR #8 `refactor(agent)` | Done: `inference/config.ts`, error names the version |
+| S3 pre-upgrade sessions | PR #8 `refactor(agent)` | Done: lazy legacy binding, neutral `INFERENCE_UNAVAILABLE` |
+| S4 key attribution | PR #8 `feat(api)` | Done: `requestedByKeyId`, `proposedById`, `proposedByKeyId` |
+| S5 real-DB concurrency | PR #8 `test(api)` | Done: `sales-approval.integration.spec.ts` |
+| S6 profile literal CHECKs | PR #8 `feat(api)` | Done: CHECKs dropped, `producedBy` required |
+| S7 sales page unreachable | PR #8 `feat(app)` | Done: rail entry, production copy |
+| S8 call-site styling | PR #8 `feat(app)` | Done: `DescriptionList` in `packages/ui`, `Alert` |
+| S9 REST verb | PR #8 `feat(api)` | Done: `GET /sales/requests/pending` |
+| S10 research-gate leftovers | PR #8 `feat(app)` | Done: route, constant and export removed |
+| S11 no MCP fail tool | PR #8 `feat(api)` | Done: `sales_fail_request` |
+| S12 legacy key label | PR #11 | Done: *Legacy: full access* |
+| S13 docs contradict StartOS | PR #8 `feat(startos)` | Done |
+| N1 non-root container | — | Not done: `FOLLOWUPS.md` G |
+| N2 Python turbo check | PR #8 `docs(crm)` | Done: replaced by `turbo-env.spec.ts` |
+| N3 empty commit | — | Squash-merge removes it |
+| N4 catalog egress in `LOCAL` | — | Not done: small, listed for the next PR |
+| N5 `EXPOSE` ports | — | Left alone |
+
 ## Issues
 
-1. BROKEN — StartOS cannot reach Ollama with the PR's allow-list. Local
-   inference never starts on the box.
-   Fix: not done. Plan step 4 (B1). Needs your approval.
-2. BROKEN — No production caller of `processSalesRequest`. Requests stay
-   pending.
-   Fix: not done. Plan step 9 (B2). Needs decision D2.
-3. BROKEN — Root chat in `LOCAL` mode fails after `keep_alive` and exceeds
-   4096 tokens.
-   Fix: not done. Plan step 6 (B3). Needs decision D3.
-4. BROKEN — Backups on the current release fail; the PR's fix is correct but
-   unreleased.
-   Fix: not done. Plan step 1 (S1).
-5. BROKEN — `hermes_sales` keys cannot be created from the UI.
-   Fix: not done. Plan step 2 (B4).
-6. RISK — Pre-upgrade conversations fail in legacy mode with a local-inference
-   error.
-   Fix: not done. Plan step 7 (S3).
-7. RISK — Proposals do not record which key stored them.
-   Fix: not done. Plan step 3 (S4).
-8. RISK — knip fails on this branch; one new finding, the rest pre-existing.
-   knip is not in CI.
-   Fix: not done. Plan step 12 removes the new one.
-9. NOT DONE — `docker compose` did not run; PostgreSQL 16 stood in for 17.
-   Fix: CI and the StartOS package use 17; Phase 3 DB tests run on 17 if
-   Docker is available there, else stay on 16 and say so.
-10. NOT DONE — Real Ollama end-to-end test. No GPU or Ollama in this sandbox.
-    Fix: Phase 3 uses a labelled mocked Ollama; the smoke script runs on
-    your server.
-11. UNKNOWN — Server architecture (x86_64 or aarch64).
-    Fix: decision D4.
+1. RISK — `LOCAL` mode runs sales extraction only; the research chat is
+   denied there until a larger profile is measured.
+   Fix: not done. `FOLLOWUPS.md` D.
+2. NOT DONE — Nothing schedules in-CRM extraction; an external agent must
+   file proposals over MCP.
+   Fix: not done. `FOLLOWUPS.md` E.
+3. RISK — `GET /settings/model-catalog` still reaches the Vercel Gateway when
+   called directly in `LOCAL` mode.
+   Fix: not done. One guard in `ModelCatalogService`; next PR.
+4. RISK — knip still fails on pre-existing findings and is not in CI.
+   Fix: not done. `FOLLOWUPS.md` H. The one finding this branch added is gone.
+5. NOT DONE — `docker compose` did not run; PostgreSQL 16 stood in for 17 in
+   every test run here. CI runs 17.
+   Fix: CI is the proof for 17.
+6. NOT DONE — No real Ollama in this sandbox. The local path is proven against
+   a mocked Ollama only; `scripts/smoke-startos.sh` is the proof on the server.
+   Fix: run the smoke script after sideloading.
+7. UNKNOWN — Server architecture. CI publishes both `.s9pk` files.
+   Fix: pick the file the release notes name for your machine.
+8. UNKNOWN — `retireExhausted > retires no more rows than the limit allows`
+   failed twice in full agent runs here and passed alone. `docs/agent.md`
+   records it as a known intermittent failure that predates this work.
+   Fix: not done; not in this PR's files.
