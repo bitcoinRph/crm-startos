@@ -189,6 +189,29 @@ middlewares as the app. It is a wire format, not a second data surface.
   management, SSO and tracking settings stay out. Adding a tool is one entry in
   `mcp-tools.ts`; adding a destructive one is a review question.
 
+### An API key carries a profile
+
+A key is created with one profile (`api-keys/api-key-profiles.ts`), stored as
+Better Auth's `permissions` on the key. `AuthMiddleware` verifies the key on
+every call and `authorizeApiKeyProcedure` (`trpc/api-key-access.ts`) decides
+from the stored permissions, never from the request.
+
+| Profile | Permissions | What it can do |
+| --- | --- | --- |
+| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can |
+| `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
+| `agent_read` | `crm:read` | Queries only |
+
+- **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales`
+  permissions are reserved for the proposal procedures and grant nothing else.
+- **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
+- **A key created before profiles has no permissions and keeps full access.**
+  The table shows it as *Legacy: full access* so the owner can rotate it.
+- **The profile name says what the key can do, not which agent holds it.** The
+  free-text `name` is where "hermes" or "openclaw" goes.
+- **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
+  endpoint. `keyFromHeaders` normalises it before the session is resolved.
+
 ## Two mail providers, one pipeline
 
 `apps/api/src/mailbox` is everything neither Google nor Microsoft owns:

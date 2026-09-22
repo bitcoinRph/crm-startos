@@ -24,6 +24,7 @@ import { LocalRelativeTime } from "@/components/local-date-time";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { accessLabel } from "./api-key-profiles";
 import { apiKeysSearchParams } from "./api-keys-search-params";
 
 type ApiKeyRow = RouterOutputs["apiKeys"]["list"]["rows"][number];
@@ -42,7 +43,7 @@ function columns(
 			header: "Name",
 			sortable: true,
 			hideable: false,
-			width: "w-[28%]",
+			width: "w-[22%]",
 			cell: (row) => (
 				<span className="truncate font-medium">
 					{row.name ?? "Untitled key"}
@@ -52,10 +53,21 @@ function columns(
 		{
 			id: "start",
 			header: "Key",
-			width: "w-[20%]",
+			width: "w-[12%]",
 			hideBelow: "sm",
 			cell: (row) => (
 				<Badge variant="mono">{row.start ? `${row.start}…` : "—"}</Badge>
+			),
+		},
+		{
+			id: "profile",
+			header: "Access",
+			width: "w-[18%]",
+			hideBelow: "sm",
+			cell: (row) => (
+				<Badge variant={row.profile ? "outline" : "secondary"}>
+					{accessLabel(row.profile)}
+				</Badge>
 			),
 		},
 		{

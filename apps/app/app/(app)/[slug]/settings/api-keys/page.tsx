@@ -30,8 +30,8 @@ export default function ApiKeysSettingsPage({
 				<PageShellHeading>
 					<PageShellTitle>API Keys</PageShellTitle>
 					<PageShellDescription>
-						Personal keys for calling the CRM API. Each one acts as you —
-						anything it can read or change is exactly what you can.
+						Personal keys for the CRM API and the MCP endpoint. Each one acts as
+						you, within the access you give it.
 					</PageShellDescription>
 				</PageShellHeading>
 
