@@ -98,13 +98,12 @@ export class ApiKeysService {
 
 	async create(
 		userId: string,
-		headers: Headers,
 		input: CreateApiKeyInput,
 	): Promise<CreatedApiKey> {
 		const created = await this.call(() =>
 			auth.api.createApiKey({
-				headers,
 				body: {
+					userId,
 					name: input.name,
 					permissions: KEY_PERMISSIONS[input.profile],
 					expiresIn:

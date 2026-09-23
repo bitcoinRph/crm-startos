@@ -202,6 +202,19 @@ Three consequences worth knowing:
 protection requiring the `check-types, lint, test` and `conventional commit` checks** — not the
 release workflow, which cannot wait on a run in another workflow.
 
+### StartOS packages
+
+The StartOS workflow builds both architectures after promotion to `release`.
+With `AUTOMATION_TOKEN`, the promotion push starts the build.
+Without it, the Release workflow dispatches the same StartOS workflow explicitly.
+GitHub suppresses downstream push workflows for changes made with `GITHUB_TOKEN`.
+The dispatch needs `actions: write`; publication remains restricted to `release`.
+
+Feature pull requests still target `main`. Their merge opens or updates the
+release-please pull request. Merging that release pull request creates the tag,
+promotes it, and starts packaging. No feature pull request publishes packages.
+Raise `deploy/startos/startos/versions/current.ts` for each new package release.
+
 ### When it jams
 
 A jam used to be silent — the workflow reported success while doing nothing, and the symptom was

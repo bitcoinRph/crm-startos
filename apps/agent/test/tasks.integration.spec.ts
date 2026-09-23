@@ -144,6 +144,65 @@ describe("claimDue", () => {
 });
 
 describe("retireExhausted", () => {
+	it("keeps the limit when PostgreSQL rescans the candidates", async () => {
+		const mine = await Promise.all([queue(), queue(), queue()]);
+		await db.agentTask.updateMany({
+			where: { id: { in: mine.map((task) => task.id) } },
+			data: { attempts: MAX_ATTEMPTS },
+		});
+
+		const url = new URL(process.env.TEST_DATABASE_URL ?? "");
+		url.searchParams.set(
+			"options",
+			"-c enable_hashjoin=off -c enable_mergejoin=off -c enable_hashagg=off -c enable_sort=off -c enable_material=off",
+		);
+		const tasks = new URL("../agent/lib/tasks.ts", import.meta.url).pathname;
+		const child = Bun.spawn({
+			cmd: [
+				process.execPath,
+				"--eval",
+				`import { db } from ${JSON.stringify(new URL("../../../packages/db/src/index.ts", import.meta.url).pathname)};
+				import { retireExhausted } from ${JSON.stringify(tasks)};
+				console.log(JSON.stringify([
+					(await retireExhausted(2)).length,
+					(await retireExhausted(2)).length,
+					(await retireExhausted(2)).length,
+				]));
+				await db.$disconnect();`,
+			],
+			env: {
+				...process.env,
+				NODE_ENV: "test",
+				TEST_DATABASE_URL: url.href,
+				PRISMA_LOG_QUERIES: "false",
+			},
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const output = await new Response(child.stdout).text();
+		const errors = await new Response(child.stderr).text();
+		expect(await child.exited, errors).toBe(0);
+		expect(JSON.parse(output)).toEqual([2, 1, 0]);
+	});
+
+	it("retires disjoint bounded batches across dispatchers", async () => {
+		const mine = await Promise.all(Array.from({ length: 6 }, () => queue()));
+		await db.agentTask.updateMany({
+			where: { id: { in: mine.map((task) => task.id) } },
+			data: { attempts: MAX_ATTEMPTS },
+		});
+		const batches = await Promise.all([
+			retireExhausted(2),
+			retireExhausted(2),
+			retireExhausted(2),
+		]);
+		for (const batch of batches) expect(batch).toHaveLength(2);
+		const ids = batches.flat().map((task) => task.id);
+		expect(new Set(ids).size).toBe(6);
+		expect(ids.sort()).toEqual(mine.map((task) => task.id).sort());
+		expect(await retireExhausted(2)).toHaveLength(0);
+	});
+
 	it("gives up on a row that never reported back, and says who it was about", async () => {
 		const contact = await someone();
 		const task = await queue({ contactId: contact.id });
