@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { processSalesRequest } from "../agent/lib/sales-workflow";
+import { processSalesRequest } from "../../agent/lib/sales-workflow";
 
 const fixture = z
 	.object({
@@ -19,16 +19,21 @@ const headers = {
 };
 while (Date.now() < deadline) {
 	const pending = await fetch(`${base}/sales/requests/pending`, {
-		method: "POST",
+		method: "GET",
 		headers,
-		body: "{}",
 		signal: AbortSignal.timeout(5000),
 	});
 	if (!pending.ok) throw new Error(`Pending request failed: ${pending.status}`);
 	const rows = z
 		.array(
 			z
-				.object({ id: z.string(), source: z.string(), contactId: z.string() })
+				.object({
+					id: z.string(),
+					source: z.string(),
+					contactId: z.string(),
+					profileId: z.string(),
+					profileRevision: z.string(),
+				})
 				.passthrough(),
 		)
 		.parse(await pending.json());

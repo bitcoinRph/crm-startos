@@ -12,6 +12,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
@@ -80,6 +81,22 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           exit 1
+
+      - name: Build StartOS after token-based promotion
+        if: steps.release.outputs.tag_name || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          AUTOMATION_CONFIGURED: ${{ secrets.AUTOMATION_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$AUTOMATION_CONFIGURED" = "true" ]; then
+            exit 0
+          fi
+
+          gh workflow run startos.yml --ref release
+          echo "Dispatched StartOS packaging on release; GITHUB_TOKEN promotion does not emit a workflow-triggering push." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Say what happened
         if: ${{ !steps.release.outputs.tag_name }}

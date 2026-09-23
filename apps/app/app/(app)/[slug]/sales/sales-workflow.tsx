@@ -35,6 +35,7 @@ import { approvedSalesProfile } from "@crm/validation/sales";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "api/app-router";
+import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { z } from "zod";
 import { useTRPC } from "@/lib/trpc/client";
@@ -44,12 +45,32 @@ export type SalesRequest = inferRouterOutputs<AppRouter>["sales"]["getRequest"];
 const contactRevision = z.object({ updatedAt: z.iso.datetime() });
 
 export function SalesWorkflow() {
+	const [requestId, setRequestId] = useQueryState(
+		"requestId",
+		parseAsString.withDefault(""),
+	);
+	return (
+		<SalesWorkflowContent
+			key={requestId}
+			requestId={requestId}
+			setRequestId={(id) => void setRequestId(id || null)}
+		/>
+	);
+}
+
+function SalesWorkflowContent({
+	requestId,
+	setRequestId,
+}: {
+	requestId: string;
+	setRequestId: (id: string) => void;
+}) {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const [contactId, setContactId] = useState("");
 	const [selectedId, setSelectedId] = useState("");
 	const [source, setSource] = useState("");
-	const [requestId, setRequestId] = useState("");
+	const [requestToOpen, setRequestToOpen] = useState("");
 	const contact = useQuery(
 		trpc.contacts.byId.queryOptions(
 			{ id: selectedId },
@@ -117,6 +138,33 @@ export function SalesWorkflow() {
 					Retry request status
 				</Button>
 			)}
+			<form
+				onSubmit={(event) => {
+					event.preventDefault();
+					if (!requestToOpen || create.isPending || approve.isPending) return;
+					setRequestId(requestToOpen);
+				}}
+			>
+				<FieldGroup>
+					<Field>
+						<FieldLabel htmlFor="sales-open-request">Request ID</FieldLabel>
+						<Input
+							id="sales-open-request"
+							required
+							value={requestToOpen}
+							onChange={(event) => setRequestToOpen(event.target.value)}
+							disabled={create.isPending || approve.isPending}
+						/>
+					</Field>
+					<Button
+						type="submit"
+						variant="outline"
+						disabled={!requestToOpen || create.isPending || approve.isPending}
+					>
+						Open request
+					</Button>
+				</FieldGroup>
+			</form>
 			{!active && (
 				<Card>
 					<CardHeader>
@@ -284,7 +332,7 @@ export function SalesWorkflow() {
 					}}
 				/>
 			)}
-			{active && request.data && request.data.status !== "PENDING" && (
+			{active && (
 				<Button
 					variant="outline"
 					disabled={approve.isPending}
