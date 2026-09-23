@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.1](https://github.com/bitcoinRph/crm-startos/compare/v1.17.0...v1.17.1) (2026-09-23)
+
+
+### Fixes
+
+* **agent:** materialize bounded task retirement candidates ([a41f2cb](https://github.com/bitcoinRph/crm-startos/commit/a41f2cb1f8f9a9dfe249a6248eab4118a320d9be))
+* **crm:** secure key management and restore sales request recovery ([f35d5b6](https://github.com/bitcoinRph/crm-startos/commit/f35d5b65fcc317edb14ce5c08ab03f8c61705106))
+
 ## [1.17.0](https://github.com/bitcoinRph/crm-startos/compare/v1.16.0...v1.17.0) (2026-09-22)
 
 
