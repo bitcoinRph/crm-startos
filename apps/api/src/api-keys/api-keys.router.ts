@@ -55,7 +55,7 @@ export class ApiKeysRouter {
 		@Ctx() ctx: AuthedTrpcContext,
 		@Input() input: z.infer<typeof createApiKeyInput>,
 	) {
-		return this.apiKeys.create(ctx.user.id, headersOf(ctx), input);
+		return this.apiKeys.create(ctx.user.id, input);
 	}
 
 	@Mutation({
