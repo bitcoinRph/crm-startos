@@ -31,6 +31,11 @@ so the row survives the agent being down.
 About to add a vendor client to `apps/api`? You want `apps/agent/agent/lib`. One
 documented exception, for timing: the exchange-rate fetcher, below.
 
+When a settings screen needs a vendor answer now, the API asks the agent over the
+bridge and relays the parsed answer: `POST /internal/crm/verify-key` for Context,
+`POST /internal/crm/codex/*` for Codex sign-in (`docs/codex.md`). The API holds no
+vendor client and no vendor credential for either.
+
 ## One organization, and it is not a tenancy boundary
 
 Single tenant. No org header, no org interceptor, no org-scoped cache keys, **no

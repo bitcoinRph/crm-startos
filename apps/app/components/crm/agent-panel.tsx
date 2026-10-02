@@ -17,6 +17,7 @@ import {
 } from "@crm/ui/components/attachment";
 import { Bubble, BubbleContent } from "@crm/ui/components/bubble";
 import { Button } from "@crm/ui/components/button";
+import { EgressBadge } from "@crm/ui/components/egress-badge";
 import {
 	Empty,
 	EmptyContent,
@@ -284,6 +285,7 @@ function Thread({
 			) : null}
 
 			<div className="border-t px-4 py-3 sm:px-5">
+				<CodexEgress />
 				{question ? (
 					<AgentClarificationComposer
 						key={question.requestId}
@@ -317,6 +319,22 @@ function Thread({
 					</form>
 				)}
 			</div>
+		</div>
+	);
+}
+
+function CodexEgress() {
+	const trpc = useTRPC();
+	const status = useQuery(trpc.codex.status.queryOptions());
+	const codex = status.data;
+	if (!codex?.connected || codex.state !== "ACTIVE" || !codex.modelId)
+		return null;
+	return (
+		<div className="pb-2">
+			<EgressBadge
+				destination="OpenAI"
+				detail={`New conversations you start go to OpenAI on ${codex.modelId}. A conversation started before you connected Codex keeps its earlier model.`}
+			/>
 		</div>
 	);
 }

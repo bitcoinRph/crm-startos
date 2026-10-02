@@ -32,6 +32,12 @@ export const DISPATCH = {
 		leaseMs: 10 * MINUTE_MS,
 	},
 
+	sales: {
+		batch: 3,
+		leaseMs: 5 * MINUTE_MS,
+		maxErrorCharacters: 500,
+	},
+
 	reconcile: {
 		scan: 200,
 		retire: 100,

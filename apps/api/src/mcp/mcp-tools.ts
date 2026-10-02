@@ -9,7 +9,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "sales_create_request",
 		procedure: "sales.createRequest",
 		description:
-			"Queue a sales extraction for one explicit contact. Requires sales proposal write permission.",
+			"Queue a sales extraction for one explicit contact. The profile picks who processes it: qwen-local-experimental/sales-qwen-v1 is processed by you through sales_store_proposal, crm-ollama/sales-qwen-v1 by the CRM on its Ollama service, crm-codex/sales-codex-v1 by the CRM on the Codex connection of the key's owner. A human approves every proposal. Requires sales proposal write permission.",
 	},
 	{
 		name: "sales_get_request",

@@ -2,6 +2,12 @@ import { db } from "@crm/db";
 import { DEFAULT_AGENT_MODEL, readAgentModel } from "@crm/db/settings";
 import { type DynamicResolveContext, defineDynamic } from "eve";
 import { defineState } from "eve/context";
+import {
+	type CodexBinding,
+	codexBindingFor,
+	codexSelection,
+	humanCaller,
+} from "./codex/selection";
 import { createLocalInference, unavailableModel } from "./inference/local";
 import {
 	bindInferenceMode,
@@ -21,6 +27,7 @@ type InferenceContext = Pick<DynamicResolveContext, "session">;
 
 const inferenceState = defineState("crm.inference-mode.v3", () => ({
 	mode: null as InferenceMode | null,
+	codex: null as CodexBinding | null,
 }));
 
 function configuredMode(): InferenceMode {
@@ -100,6 +107,17 @@ export function initializeInferenceSession(): InferenceMode {
 	return bound.mode;
 }
 
+async function bindCodex(ctx: InferenceContext): Promise<CodexBinding | null> {
+	const bound = inferenceState.get().codex;
+	if (bound) return bound;
+	if (purposeOf(ctx) !== "research") return null;
+	const userId = humanCaller(ctx, "initiator") ?? humanCaller(ctx, "current");
+	if (!userId) return null;
+	const binding = await codexBindingFor(userId);
+	if (binding) inferenceState.update((state) => ({ ...state, codex: binding }));
+	return binding;
+}
+
 export function inferenceModel(role: ModelRole = "root") {
 	const legacySelection = async (ctx: InferenceContext) =>
 		role === "runner"
@@ -110,14 +128,26 @@ export function inferenceModel(role: ModelRole = "root") {
 		fallback: unavailableModel(),
 		events: {
 			"session.started": async (_event, ctx) => {
-				if (initializeInferenceSession() !== "LEGACY_GATEWAY") return null;
+				const mode = initializeInferenceSession();
+				if (role === "root" && (await bindCodex(ctx))) return null;
+				if (mode !== "LEGACY_GATEWAY") return null;
 				return legacySelection(ctx);
 			},
 			"step.started": async (_event, ctx) => {
+				const codex = role === "root" ? inferenceState.get().codex : null;
+				if (codex)
+					return codexSelection(
+						codex,
+						humanCaller(ctx, "current"),
+						deniedSelection,
+					);
 				const decision = stepDecision(inferenceState.get(), configuredMode());
 				if (decision === "keep") return null;
 				if (decision === "deny") return deniedSelection();
-				inferenceState.update(() => ({ mode: "LEGACY_GATEWAY" }));
+				inferenceState.update((state) => ({
+					...state,
+					mode: "LEGACY_GATEWAY",
+				}));
 				return legacySelection(ctx);
 			},
 		},

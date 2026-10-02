@@ -87,9 +87,10 @@ function LocalAgentModel({ enabled }: { enabled: boolean }) {
 			</CardHeader>
 			<CardContent>
 				<p>
-					Local mode runs the fixed sales extraction workflow only. The research
-					chat, agent builder, runner, model catalog, Codex, and OpenWebUI are
-					unavailable in this mode.
+					Local mode runs the fixed sales extraction workflow on Ollama. The
+					research chat runs only for people who connect Codex below. The agent
+					builder, runner, model catalog and OpenWebUI are unavailable in this
+					mode.
 				</p>
 				<p>
 					Configuration changes require a new conversation. Local failures never

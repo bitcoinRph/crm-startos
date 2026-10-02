@@ -31,7 +31,11 @@ import {
 	SelectValue,
 } from "@crm/ui/components/select";
 import { Textarea } from "@crm/ui/components/textarea";
-import { approvedSalesProfile } from "@crm/validation/sales";
+import {
+	approvedSalesProfile,
+	SALES_PROFILES,
+	type SalesProfile,
+} from "@crm/validation/sales";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "api/app-router";
@@ -68,6 +72,7 @@ function SalesWorkflowContent({
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const [contactId, setContactId] = useState("");
+	const [profile, setProfile] = useState<SalesProfile>(approvedSalesProfile);
 	const [selectedId, setSelectedId] = useState("");
 	const [source, setSource] = useState("");
 	const [requestToOpen, setRequestToOpen] = useState("");
@@ -190,8 +195,8 @@ function SalesWorkflowContent({
 									source,
 									candidateIds: [contact.data.id],
 									expectedUpdatedAt: revision.data.updatedAt,
-									profileId: approvedSalesProfile.id,
-									profileRevision: approvedSalesProfile.revision,
+									profileId: profile.id,
+									profileRevision: profile.revision,
 								});
 							}}
 						>
@@ -200,22 +205,32 @@ function SalesWorkflowContent({
 									<FieldLabel htmlFor="sales-profile">
 										Inference profile
 									</FieldLabel>
-									<Select value={approvedSalesProfile.id}>
+									<Select
+										value={profile.id}
+										onValueChange={(id) =>
+											setProfile(
+												SALES_PROFILES.find((entry) => entry.id === id) ??
+													approvedSalesProfile,
+											)
+										}
+										disabled={create.isPending}
+									>
 										<SelectTrigger id="sales-profile">
 											<SelectValue>
-												{approvedSalesProfile.id} /{" "}
-												{approvedSalesProfile.revision}
+												{profile.id} / {profile.revision}
 											</SelectValue>
 										</SelectTrigger>
 										<SelectContent>
 											<SelectGroup>
-												<SelectItem value={approvedSalesProfile.id}>
-													{approvedSalesProfile.id} /{" "}
-													{approvedSalesProfile.revision}
-												</SelectItem>
+												{SALES_PROFILES.map((entry) => (
+													<SelectItem key={entry.id} value={entry.id}>
+														{entry.id} / {entry.revision}
+													</SelectItem>
+												))}
 											</SelectGroup>
 										</SelectContent>
 									</Select>
+									<FieldDescription>{profile.label}.</FieldDescription>
 								</Field>
 								<Field>
 									<FieldLabel htmlFor="sales-contact">Contact ID</FieldLabel>

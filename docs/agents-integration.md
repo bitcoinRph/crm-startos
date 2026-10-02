@@ -106,6 +106,22 @@ A proposal must quote the request's source exactly; the server rejects anything
 else. Name your model in `producedBy`. The CRM records which key filed each
 proposal and shows it on the review page.
 
+## Letting the CRM do the work on Codex or Ollama
+
+`sales_create_request` takes a profile. It decides who processes the request:
+
+| `profileId` / `profileRevision` | Who processes it |
+| --- | --- |
+| `qwen-local-experimental` / `sales-qwen-v1` | Your agent: read it with `sales_pending_requests`, answer with `sales_store_proposal` |
+| `crm-ollama` / `sales-qwen-v1` | The CRM, on the Ollama service (needs **Configure Local Inference** with `qwen3.5:4b`) |
+| `crm-codex` / `sales-codex-v1` | The CRM, on the Codex connection of the user who owns the key (Settings → General → Codex) |
+
+So Hermes or OpenClaw spend your ChatGPT plan only through work the CRM does
+for you, and the result still waits for your approval. Their own Codex sign-in
+is separate: never copy a refresh token between the CRM, Hermes and OpenClaw.
+Refresh tokens are single-use, and a copy ends both sessions at the next
+refresh. `docs/codex.md` has the details.
+
 ## Checking a key from a shell
 
 ```sh
@@ -127,8 +143,10 @@ on StartOS uses MCP.
 
 ## What leaves your server
 
-Nothing, for these paths. The agent process holding the key is the only client,
-and the CRM calls no vendor for an MCP request. Local inference talks to the
+Nothing, for these paths, unless a request names `crm-codex`. The agent process
+holding the key is the only client, and the CRM calls no vendor for an MCP
+request. A `crm-codex` request sends its note to OpenAI on the requester's
+connection, and the Settings card shows **Sends to OpenAI** while it is on. Local inference talks to the
 Ollama service on the same StartOS box (`deploy/startos/README.md`). The
 optional Gateway, Perplexity, GitHub and Blob keys in **Configure Research
 Agent** are the only egress, and each is off until you enter it.

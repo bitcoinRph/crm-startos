@@ -127,6 +127,7 @@ single place that knows what is set.
 | `CRM_INFERENCE_MODE` | Explicit `LOCAL` or `LEGACY_GATEWAY` selection |
 | `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS` | Comma-separated non-loopback hosts allowed in local mode |
 | `CRM_LOCAL_INFERENCE_JSON` | Operator-managed local profile; see `local-inference.md` |
+| `CRM_SECRETS_KEY` | 64 hex characters that seal each user's Codex credentials; see `codex.md` |
 | `AGENT_BRIDGE_SECRET` | The rep-facing Agent panel — see `agent.md` |
 
 `BLOB_READ_WRITE_TOKEN` is also in `env.validation.ts` and `apps/api/turbo.json`
