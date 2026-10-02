@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/bitcoinRph/crm-startos/compare/v1.17.1...v1.18.0) (2026-10-02)
+
+
+### Features
+
+* **crm:** per-user Codex sign-in, Codex models and an in-CRM sales worker ([2c1dcdb](https://github.com/bitcoinRph/crm-startos/commit/2c1dcdb03827153ef536a45e69ace5e27717ad75))
+
 ## [1.17.1](https://github.com/bitcoinRph/crm-startos/compare/v1.17.0...v1.17.1) (2026-09-23)
 
 
