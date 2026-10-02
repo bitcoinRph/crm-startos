@@ -10,6 +10,8 @@ export const appDir = '/app'
 export const assetsDir = '/assets'
 
 export const secretCharset = 'a-z,A-Z,0-9'
+export const hexCharset = 'a-f,0-9'
+export const secretsKeyLength = 64
 
 export const ollamaPackageId = 'ollama'
 export const ollamaHostId = 'api-multi'

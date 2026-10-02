@@ -50,6 +50,9 @@ model User {
 
   apiKeys Apikey[]
 
+  codexConnection  CodexConnection?
+  codexDeviceLogin CodexDeviceLogin?
+
   @@unique([email])
   @@map("user")
 }
@@ -1574,6 +1577,7 @@ model SalesRequest {
   requestedByKeyId String?
   status SalesRequestStatus @default(PENDING)
   error String?
+  leasedUntil DateTime?
   createdAt DateTime @default(now())
   proposal SalesProposal?
 
@@ -1628,4 +1632,44 @@ model Apikey {
   @@index([configId])
   @@index([key])
   @@map("apikey")
+}
+
+enum CodexCredentialKind {
+  CHATGPT
+  API_KEY
+}
+
+enum CodexConnectionStatus {
+  ACTIVE
+  NEEDS_RECONNECT
+}
+
+model CodexConnection {
+  userId                   String                @id
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind                     CodexCredentialKind
+  status                   CodexConnectionStatus @default(ACTIVE)
+  sealed                   String
+  label                    String
+  planType                 String?
+  modelId                  String?
+  modelContextWindowTokens Int?
+  accessExpiresAt          DateTime?
+  lastError                String?
+  connectedAt              DateTime              @default(now())
+  refreshedAt              DateTime?
+  updatedAt                DateTime              @updatedAt
+
+  @@map("codexConnection")
+}
+
+model CodexDeviceLogin {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sealed    String
+  interval  Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("codexDeviceLogin")
 }

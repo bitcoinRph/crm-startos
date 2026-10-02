@@ -16,6 +16,7 @@ test("turbo passes the inference variables through its strict environment", () =
 		"CRM_INFERENCE_MODE",
 		"CRM_LOCAL_INFERENCE_ALLOWED_HOSTS",
 		"CRM_LOCAL_INFERENCE_JSON",
+		"CRM_SECRETS_KEY",
 	])
 		expect(turbo.globalPassThroughEnv).toContain(key);
 });

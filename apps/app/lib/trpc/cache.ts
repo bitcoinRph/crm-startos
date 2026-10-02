@@ -40,6 +40,7 @@ export type CrmCache = {
 	slack(options?: Options): Promise<void>;
 	sso(options?: Options): Promise<void>;
 	apiKeys(options?: Options): Promise<void>;
+	codex(options?: Options): Promise<void>;
 	tracking(options?: Options): Promise<void>;
 	everything(): Promise<void>;
 };
@@ -316,6 +317,13 @@ export function useCrmCache(): CrmCache {
 			),
 
 		apiKeys: (options) => run([trpc.apiKeys.list.pathKey()], [], options),
+
+		codex: (options) =>
+			run(
+				[trpc.codex.status.queryKey()],
+				[trpc.codex.models.queryKey()],
+				options,
+			),
 
 		tracking: (options) =>
 			run(

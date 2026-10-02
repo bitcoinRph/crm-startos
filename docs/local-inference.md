@@ -30,6 +30,7 @@ Deployed version model IDs never move to another destination.
 A runner in `LEGACY_GATEWAY` uses the model stored on its immutable deployed version.
 There is no local-to-Gateway fallback.
 The deny-only model fails with `INFERENCE_UNAVAILABLE`.
+A research conversation whose initiator has an active Codex connection with a chosen model binds that connection in the same state (`codex`) and runs on Codex in every mode. See `codex.md`.
 
 ## Local profile
 
@@ -57,13 +58,13 @@ Callers cannot replace these controls.
 
 | Feature | LOCAL | LEGACY_GATEWAY |
 | --- | --- | --- |
-| Fixed sales extraction workflow | Available | Available |
-| Root research chat | Unavailable (the root prompt and tools exceed 4096 tokens; see FOLLOWUPS.md) | Upstream Gateway behavior |
+| Fixed sales extraction workflow | Available (`crm-ollama`, processed by the dispatch tick) | Available |
+| Root research chat | Unavailable on Ollama (the root prompt and tools exceed 4096 tokens; see FOLLOWUPS.md). Available on the user's Codex connection | Upstream Gateway behavior, or the user's Codex connection |
 | Agent builder | Unavailable | Available |
 | Deployed agent runner | Unavailable | Available |
 | Model catalog and model selection | Hidden | Available |
 | Cloud fallback | Never | Gateway is the selected mode |
-| Codex connection | Unavailable | Unavailable |
+| Codex connection | Per user, see `codex.md` | Per user, see `codex.md` |
 | OpenWebUI connection | Unavailable | Unavailable |
 
 Builder and runner source stays under `apps/agent/agent/subagents/` for legacy mode.
@@ -91,9 +92,9 @@ A successful unit test does not establish browser, database, packaging, or live 
 
 ## Issues
 
-1. NOT DONE — Local mode does not run the research chat, the agent builder or the runner.
-   Fix: not done. The root prompt with its 27 tools needs about 5150 tokens; a warm-up and a measured larger profile are a follow-up (`FOLLOWUPS.md`).
+1. NOT DONE — Local mode does not run the research chat on Ollama, the agent builder or the runner.
+   Fix: not done. The root prompt with its 27 tools needs about 5150 tokens; a warm-up and a measured larger profile are a follow-up (`FOLLOWUPS.md`). A user with Codex connected has the research chat.
 2. RISK — Runner verification is not an atomic allocation lease. Another client can unload or reload the model between the check and the request.
    Fix: not done. The sales path warms the model itself before each request, which narrows the window.
-3. NOT DONE — Codex and OpenWebUI adapters are unavailable.
-   Fix: not done. Designs in `FOLLOWUPS.md`.
+3. NOT DONE — The OpenWebUI adapter is unavailable.
+   Fix: not done. Design in `FOLLOWUPS.md`.

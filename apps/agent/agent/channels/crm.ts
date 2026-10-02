@@ -6,6 +6,15 @@ import { eveTurnFailure } from "@crm/validation/eve-stream";
 import { defineChannel, GET, POST } from "eve/channels";
 import { z } from "zod";
 import { persistBuilderInputRequest } from "../lib/builder-input";
+import {
+	apiKeyRoute,
+	chooseModelRoute,
+	devicePollRoute,
+	deviceStartRoute,
+	disconnectRoute,
+	modelsRoute,
+	statusRoute,
+} from "../lib/codex/routes";
 import { verifyKey } from "../lib/context-dev";
 import {
 	builderIdFromToken,
@@ -237,6 +246,48 @@ export default defineChannel({
 
 			return Response.json(await verifyKey(apiKey));
 		}),
+
+		POST("/internal/crm/codex/status", async (request) =>
+			authorised(request)
+				? statusRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/device/start", async (request) =>
+			authorised(request)
+				? deviceStartRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/device/poll", async (request) =>
+			authorised(request)
+				? devicePollRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/api-key", async (request) =>
+			authorised(request)
+				? apiKeyRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/models", async (request) =>
+			authorised(request)
+				? modelsRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/model", async (request) =>
+			authorised(request)
+				? chooseModelRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
+
+		POST("/internal/crm/codex/disconnect", async (request) =>
+			authorised(request)
+				? disconnectRoute(request)
+				: new Response("Unauthorized", { status: 401 }),
+		),
 	],
 
 	events: {

@@ -24,6 +24,8 @@ See `docs/local-inference.md` for the complete mode and session contract.
 - Runner sessions in legacy mode use the model stored on their deployed version.
 - Settings show local limits in local mode and the original catalog in legacy mode.
 - The verified Ollama versions live in `lib/inference/config.ts`, nowhere else.
+- A user who connected Codex and chose a model gets the research chat on Codex in every mode. The binding is per conversation and per user. See `docs/codex.md`.
+- The dispatch tick runs `lib/sales-worker.ts`, which processes sales requests on the `crm-ollama` and `crm-codex` profiles. It decides nothing about the CRM: every result is a proposal a human approves.
 
 ## Pictures are copied, never linked
 

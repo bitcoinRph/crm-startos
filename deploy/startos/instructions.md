@@ -69,6 +69,15 @@ mcp_servers:
 
 The agent gets tools to search the CRM, read and update companies, contacts and deals, log notes and tasks, and queue research. It acts as the user who created the key. If your client does not trust your server's certificate, use the address's `http` form on your own network.
 
+### Using your ChatGPT plan (Codex)
+
+1. Open **Settings → General** and find **Codex (your ChatGPT plan)**.
+2. Select **Connect ChatGPT**. The CRM shows a code. Open the link, sign in to ChatGPT and enter the code. If OpenAI refuses, turn on device code login in your ChatGPT security settings.
+3. Choose a model. New research conversations you start now run on that model. Conversations you already had keep their model.
+4. To let an agent such as Hermes use your plan for CRM work, have it file sales requests with profile `crm-codex`. The CRM runs them on your connection and you approve the result on the Sales page. Your sign-in never leaves the CRM.
+
+You can connect an OpenAI API key instead; it is billed per token on your OpenAI Platform account. **Disconnect** removes the connection and revokes the sign-in at OpenAI.
+
 ### Actions
 
 - **Set Sign-in Credentials** — create or reset the password account. Takes effect on the next start.
@@ -82,4 +91,5 @@ The agent gets tools to search the CRM, read and update companies, contacts and 
 - Local configuration never falls back to cloud inference. A model failure becomes a visible failure.
 - The agent's own shell runs in a pure-JavaScript sandbox with no real binaries, because StartOS has no Docker for it. Its research still works; scripts it writes for itself may not.
 - The research agent reads web pages you did not choose. A page can carry text written to give the agent new instructions, and the agent can act on it with your CRM data. Give the agent a key only if you accept that.
-- Sign-in tokens for Google and Microsoft, and any third-party keys you enter, are stored as plain text in the service's database. Your backups carry them too. Keep both private.
+- Sign-in tokens for Google and Microsoft, and any third-party keys you enter, are stored as plain text in the service's database. Codex sign-ins are encrypted with a key kept in the service's settings. Your backups carry all of them, and the key. Keep backups private.
+- Codex uses the ChatGPT backend that the Codex CLI uses. OpenAI has not published that backend for other applications, so OpenAI can change or stop it. Use only your own account.

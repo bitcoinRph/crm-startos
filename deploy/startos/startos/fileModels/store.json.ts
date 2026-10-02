@@ -42,6 +42,7 @@ const shape = z.object({
   authSecret: z.string().catch(''),
   bridgeSecret: z.string().catch(''),
   cronSecret: z.string().catch(''),
+  secretsKey: z.string().catch(''),
   admin: adminShape.catch(() => adminShape.parse({})),
   signIn: signInShape.catch(() => signInShape.parse({})),
   agent: agentShape.catch(() => agentShape.parse({})),

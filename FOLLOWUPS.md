@@ -44,38 +44,17 @@ Verification: an MCP `tools/list` per profile in a bridge test.
 
 ## B. Codex in the CRM
 
-### What must be true before any code
+Implemented in this branch; `docs/codex.md` is the reference. What is left:
 
-1. **Auth facts.** Codex signs in either with an OpenAI API key or with a
-   ChatGPT account through an OAuth flow that Codex CLI performs itself. Read
-   the current Codex CLI source and OpenAI's terms for the ChatGPT sign-in
-   before designing around it. Do not assume a ChatGPT session token is
-   usable by a third-party server.
-2. **Terms.** Confirm in writing which credential OpenAI permits a self-hosted
-   server to hold and call with. Ship only the credential the terms allow. The
-   safe default is an API key the user creates for this CRM.
-
-### Design when the terms allow it
-
-- **Storage.** A `CodexConnection` row holds the credential encrypted with a
-  key derived from a secret in the StartOS store (`store.json`), never in
-  plaintext, never in a log, never returned by any tRPC, REST or MCP call. The
-  UI shows only "connected as … since …" and the last four characters.
-- **Connect / disconnect.** Two session-only tRPC mutations and a StartOS
-  action **Connect Codex** for operators who prefer the service page. Disconnect
-  deletes the row and revokes the token when the provider supports it.
-- **Least privilege.** The connection runs only the code-review and drafting
-  tasks the user starts from a record. It gets no CRM write tool. Its output is
-  a proposal, approved like a sales proposal.
-- **Egress indicator.** Every screen that can send text to OpenAI shows a
-  persistent "Sends to OpenAI" badge (a `packages/ui` variant), and the send
-  is a click, never automatic.
-- **API-key fallback.** When ChatGPT sign-in is not permitted, the same row
-  stores an OpenAI API key with the same encryption and the same UI.
-
-Verification: a spec that reads every tRPC output schema and fails when a field
-named `token`, `secret` or `apiKey` appears; a spec that the connect mutation
-refuses an API key request; the smoke script extended with a disconnect.
+- **OpenAI's sign-in program for apps.** OpenAI documents a separate "Sign in
+  with ChatGPT" flow for open-source and locally run apps, with a per-app client
+  and `api.openai.com/v1/responses`. This repository could not read those pages
+  (egress-blocked), and the secondary source says it is loopback-only with no
+  device flow. Verify it, then decide whether it replaces the Codex CLI client.
+- **Builder and runner on Codex.** Only the research chat binds Codex today.
+- **A per-thread egress badge.** The badge shows the user's connection state,
+  not the route the open conversation bound at its start.
+- **`tools/list` filtered by profile** (A) applies to the sales profiles too.
 
 ## C. OpenWebUI
 
@@ -100,13 +79,10 @@ refuses an API key request; the smoke script extended with a disconnect.
 
 ## E. Unattended in-CRM extraction
 
-`apps/agent/agent/lib/sales-extraction.ts` works against Ollama (mocked test:
-`apps/agent/test/local-extraction-mock.spec.ts`). Nothing schedules it. Add an
-eve schedule in `apps/agent/agent/schedules/` that, in `LOCAL` mode, reads
-pending requests through the bridge, extracts, and stores proposals with a
-`producedBy` of `crm-agent/<model>`. Requires a service credential for the
-agent; the cleanest is a dedicated `agent_propose` key seeded by the StartOS
-package.
+Implemented: `apps/agent/agent/lib/sales-worker.ts` runs on the dispatch tick
+for the `crm-ollama` and `crm-codex` profiles, with a lease column so two ticks
+never process one request. What is left: a real-Ollama run on StartOS, and a
+retry policy (a failed request stays `FAILED` and the agent files a new one).
 
 ## F. Pictures on a StartOS volume
 

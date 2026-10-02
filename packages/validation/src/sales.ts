@@ -1,20 +1,77 @@
 import { z } from "zod";
 
-export const approvedSalesProfile = {
-	id: "qwen-local-experimental",
-	revision: "sales-qwen-v1",
-} as const;
-export const salesRequestInput = z.strictObject({
-	source: z
-		.string()
-		.min(1)
-		.max(2048)
-		.refine((value) => new TextEncoder().encode(value).length <= 2048),
-	candidateIds: z.array(z.string().min(1)).length(1),
-	expectedUpdatedAt: z.iso.datetime(),
-	profileId: z.literal(approvedSalesProfile.id),
-	profileRevision: z.literal(approvedSalesProfile.revision),
-});
+export const SALES_PROCESSORS = ["external", "ollama", "codex"] as const;
+export type SalesProcessor = (typeof SALES_PROCESSORS)[number];
+
+export const SALES_PROFILES = [
+	{
+		id: "qwen-local-experimental",
+		revision: "sales-qwen-v1",
+		processor: "external",
+		label: "An agent you connect over MCP processes it",
+	},
+	{
+		id: "crm-ollama",
+		revision: "sales-qwen-v1",
+		processor: "ollama",
+		label: "The CRM processes it on the Ollama service",
+	},
+	{
+		id: "crm-codex",
+		revision: "sales-codex-v1",
+		processor: "codex",
+		label: "The CRM processes it on the requester's Codex connection",
+	},
+] as const satisfies readonly {
+	id: string;
+	revision: string;
+	processor: SalesProcessor;
+	label: string;
+}[];
+
+export type SalesProfile = (typeof SALES_PROFILES)[number];
+
+export const approvedSalesProfile = SALES_PROFILES[0];
+
+export function salesProfileOf(
+	id: string,
+	revision: string,
+): SalesProfile | null {
+	return (
+		SALES_PROFILES.find(
+			(profile) => profile.id === id && profile.revision === revision,
+		) ?? null
+	);
+}
+
+export function profilesFor(processor: SalesProcessor): SalesProfile[] {
+	return SALES_PROFILES.filter((profile) => profile.processor === processor);
+}
+
+const profileIds = z.enum(SALES_PROFILES.map((profile) => profile.id));
+const profileRevisions = z.enum([
+	...new Set(SALES_PROFILES.map((profile) => profile.revision)),
+]);
+
+export const salesRequestInput = z
+	.strictObject({
+		source: z
+			.string()
+			.min(1)
+			.max(2048)
+			.refine((value) => new TextEncoder().encode(value).length <= 2048),
+		candidateIds: z.array(z.string().min(1)).length(1),
+		expectedUpdatedAt: z.iso.datetime(),
+		profileId: profileIds,
+		profileRevision: profileRevisions,
+	})
+	.refine(
+		(value) => salesProfileOf(value.profileId, value.profileRevision) !== null,
+		{
+			message: "That profile and revision are not a pair.",
+			path: ["profileRevision"],
+		},
+	);
 export const salesOperation = z.discriminatedUnion("type", [
 	z.strictObject({
 		type: z.literal("contact_fact"),

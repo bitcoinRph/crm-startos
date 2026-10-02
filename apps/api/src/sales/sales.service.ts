@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "@crm/db";
+import { SalesStoreError, storeSalesProposal } from "@crm/db/sales";
 import {
 	salesApproveInput,
 	salesRequestInput,
@@ -115,61 +116,26 @@ export class SalesService {
 		requireSalesScope(actor, SALES_SCOPES.write);
 		requireSalesScope(actor, SALES_SCOPES.read);
 		const input = salesSubmitInput.parse(raw);
-		return this.db.$transaction(async (tx) => {
-			await tx.$queryRaw`SELECT id FROM "salesRequest" WHERE id = ${input.requestId}::uuid FOR UPDATE`;
-			const request = await tx.salesRequest.findUnique({
-				where: { id: input.requestId },
-				include: { proposal: true },
-			});
-			if (!request) throw new TRPCError({ code: "NOT_FOUND" });
-			let operations: ReturnType<typeof validateSalesOperations>;
-			try {
-				operations = validateSalesOperations(
-					request.source,
-					request.contactId,
-					input.operations,
-				);
-			} catch {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: "Invalid sales operations or evidence.",
-				});
-			}
-			if (request.proposal) {
-				if (
-					JSON.stringify(
-						validateSalesOperations(
-							request.source,
-							request.contactId,
-							request.proposal.operations,
-						),
-					) !== JSON.stringify(operations)
-				)
-					throw new TRPCError({
-						code: "CONFLICT",
-						message: "Proposal already exists.",
-					});
-				return request.proposal;
-			}
-			if (request.status !== "PENDING")
-				throw new TRPCError({ code: "CONFLICT" });
-			const proposal = await tx.salesProposal.create({
-				data: {
-					id: randomUUID(),
-					idempotencyKey: randomUUID(),
-					requestId: request.id,
-					operations,
+		try {
+			return await storeSalesProposal(
+				this.db,
+				{
+					requestId: input.requestId,
+					operations: input.operations,
+					producedBy: input.producedBy,
 					proposedById: actor.userId,
 					proposedByKeyId: actor.kind === "apiKey" ? actor.keyId : null,
-					producedBy: input.producedBy,
 				},
-			});
-			await tx.salesRequest.update({
-				where: { id: request.id },
-				data: { status: "PROPOSED" },
-			});
-			return proposal;
-		});
+				validateSalesOperations,
+			);
+		} catch (error) {
+			if (error instanceof SalesStoreError)
+				throw new TRPCError({
+					code: error.code,
+					message: error.message,
+				});
+			throw error;
+		}
 	}
 
 	async approveProposal<T>(actor: SalesActor, raw: T) {
