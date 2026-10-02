@@ -13,6 +13,7 @@ context until you read them, and the rules in them are not optional.
 | Deal amounts, totals, charts, exchange rates | `docs/currency.md` |
 | The record sheet's Agent tab | `docs/agent-panel.md` |
 | `/settings/connections`, integrations, the intake endpoint | `docs/connections.md` |
+| Codex sign-in, sealed credentials, Codex model routing, the sales worker | `docs/codex.md` |
 | The tracking script, the collector, form submissions | `docs/tracking.md` |
 | Running it locally, Google Cloud, DB commands, secrets | `docs/setup.md` |
 | Anything that sends a telemetry event, or a new property on one | `docs/telemetry.md` |

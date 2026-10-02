@@ -114,6 +114,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     AGENT_URL: `http://127.0.0.1:${agentPort}`,
     AGENT_BRIDGE_SECRET: store.bridgeSecret,
     CRON_SECRET: store.cronSecret,
+    ...optional('CRM_SECRETS_KEY', store.secretsKey),
     CRM_INFERENCE_MODE: inferenceMode,
     ...optional('CRM_LOCAL_INFERENCE_ALLOWED_HOSTS', localInferenceHost),
     NEXT_TELEMETRY_DISABLED: '1',

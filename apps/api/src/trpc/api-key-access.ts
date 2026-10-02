@@ -34,6 +34,7 @@ export function authorizeApiKeyProcedure(
 ): ApiKeyDecision {
 	if (path.startsWith("sales.")) return "sales";
 	if (path.startsWith("apiKeys.")) return "deny";
+	if (path.startsWith("codex.")) return "deny";
 	if (key.permissions === null) return "allow";
 	return permits(key.permissions, "crm", type === "query" ? "read" : "write")
 		? "allow"

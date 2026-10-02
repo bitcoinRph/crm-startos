@@ -109,7 +109,7 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | `API_URL` (the public URL) and `APP_URL` (every non-local address of the Web UI) | Agent model, Context key, archive retention (Settings → General) |
 | Google and Microsoft OAuth clients, Microsoft tenant | SSO providers (Settings → SSO), API keys (Settings → API keys) |
 | `AI_GATEWAY_API_KEY`, `CRM_INFERENCE_MODE`, `CRM_LOCAL_INFERENCE_JSON`, `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`, `PERPLEXITY_API_KEY`, `GITHUB_TOKEN`, `BLOB_READ_WRITE_TOKEN`, telemetry | Slack connection, tracking settings |
-| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, all four secrets, `NODE_ENV=production` | — |
+| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, all five secrets (including `CRM_SECRETS_KEY`), `NODE_ENV=production` | Codex connection per user (Settings → General → Codex) |
 
 `APP_URL` is recomputed whenever the service's addresses change, so a new domain or a disabled gateway restarts the service with the right trusted origins. `API_URL` is the **Public URL** from **Configure Sign-in**, or else the first public address, or else the first address of the Web UI.
 
@@ -143,6 +143,15 @@ Every action writes `store.json`; `main.ts` reads the store with `.const()`, so 
 
 **Configure Local Inference** stores `modelId` and `maxOutputTokens` in `store.json` under `agent.localInference`. The endpoint is never an input: when a model is set, `dependencies.ts` requires the `ollama` package (`>=0.34.0:0`, health check `primary`) and `main.ts` resolves its bridge address with `sdk.host.getBridgeAddress(effects, { packageId: 'ollama', hostId: 'api-multi', internalPort: 11434 })`, which is the only route from this container to another package (`10.0.3.1:<assigned port>`; `.embassy` and loopback names do not reach it). `main.ts` then selects `LOCAL`, passes `CRM_LOCAL_INFERENCE_JSON` with `baseURL: http://<bridge>/v1` and the fixed 4096-token context, and allow-lists the bridge host in `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`. If a model is set and Ollama is not reachable, `main.ts` throws and the service shows the error instead of starting with a dead endpoint; `.const()` re-runs it when the address changes. Local configuration takes precedence over a stored Gateway key and never falls back to cloud inference. Without a model, a configured Gateway key selects explicit `LEGACY_GATEWAY`; with neither, inference is disabled.
 
+## Codex
+
+Each CRM user connects their own ChatGPT account (or an OpenAI API key) in **Settings → General → Codex**. Nothing about Codex is an action, because a StartOS action has no CRM user to bind the connection to.
+
+- **Sign-in** is the Codex CLI's device-code flow against `https://auth.openai.com`: the CRM shows a one-time code, the user enters it at `https://auth.openai.com/codex/device` on any device, and the agent exchanges the result for tokens. No redirect reaches the server, so it works behind Tor or a `.local` address.
+- **Storage.** The agent seals the tokens with AES-256-GCM under `CRM_SECRETS_KEY`, a 64-character hex key `seedSecrets.ts` writes to `store.json` (`secretsKey`) on install and on the first start after an update. Without the key Codex is off and nothing is stored. No tRPC, REST or MCP output carries a token, and API keys are refused on every `codex.*` procedure.
+- **Use.** A research conversation started by a user who chose a Codex model runs on `https://chatgpt.com/backend-api/codex/responses` with that user's tokens, in any inference mode. Sales requests filed with profile `crm-codex` run on the requester's connection in the agent's dispatch tick; profile `crm-ollama` runs on the Ollama service. Both produce proposals a human approves on the Sales page.
+- **Backups** carry `store.json` and the database, so a restore keeps every connection. Keep backups private: the key and the sealed tokens travel together.
+
 ## Health Checks
 
 | Daemon | Check | Shown |
@@ -165,12 +174,12 @@ Pull the model inside the Ollama service before naming it here (`ollama pull qwe
 
 1. **Password sign-in exists here and not upstream.** `PASSWORD_SIGN_IN=true` enables Better Auth's email-and-password sign-in with sign-up disabled; `apps/api/scripts/local-account.ts` writes the account. Everything else about authorisation is upstream's: `ALLOWED_SIGN_IN` still decides who may have an account.
 2. **Google sign-in needs a public domain.** Google refuses `.local` redirect URIs. Set **Public URL** to a domain of this server; the Google and Microsoft callback paths are `/api/auth/callback/google` and `/api/auth/callback/microsoft` on that origin.
-3. **Inference is operator-selected.** **Configure Local Inference** selects a verified local profile and never falls back to cloud inference. Without local configuration, a Vercel AI Gateway key selects explicit legacy mode. With neither configuration, inference stays disabled. Builder and runner workflows remain available only in legacy mode.
+3. **Inference is operator-selected, Codex is per user.** **Configure Local Inference** selects a verified local profile and never falls back to cloud inference. Without local configuration, a Vercel AI Gateway key selects explicit legacy mode. With neither configuration, inference stays disabled. A user who connects Codex and chooses a model gets the research chat on Codex in every mode. Builder and runner workflows remain available only in legacy mode.
 4. **The agent's sandbox is just-bash.** No Docker and no microsandbox exist inside the service, so eve's `defaultBackend()` falls through to the pure-JavaScript interpreter: a virtual filesystem with no real binaries and no network.
 5. **Pictures need Vercel Blob.** Without `BLOB_READ_WRITE_TOKEN` contacts keep no photograph and logos are hotlinked, as upstream documents.
 6. **Telemetry is off by default** (`CRM_TELEMETRY_DISABLED=1`), the reverse of upstream. The toggle is in **Configure Research Agent**.
 7. **The scheduler replaces Vercel Cron.** `assets/scheduler.mjs` calls mailbox sync every five minutes and the rates, telemetry, retention and archive routes daily, each one minute after start.
-8. **OAuth tokens and third-party keys are stored in plaintext in Postgres**, as upstream. The volume is the boundary.
+8. **OAuth tokens and third-party keys are stored in plaintext in Postgres**, as upstream, except Codex credentials, which are sealed under `CRM_SECRETS_KEY`. The volume is the boundary.
 9. **Removing someone from the allow-list does not sign them out**; upstream checks the list when a user is created. Delete the user or rotate the auth secret to revoke access.
 
 ## What Is Unchanged from Upstream

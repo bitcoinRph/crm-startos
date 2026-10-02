@@ -1,3 +1,4 @@
+import { salesProfileOf } from "@crm/validation/sales";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import {
@@ -47,10 +48,13 @@ const inputSchema = z
 					.regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/),
 			)
 			.length(1),
-		profileId: z.literal(approvedSalesProfile.id),
-		profileRevision: z.literal(approvedSalesProfile.revision),
+		profileId: z.string(),
+		profileRevision: z.string(),
 	})
-	.strict();
+	.strict()
+	.refine(
+		(value) => salesProfileOf(value.profileId, value.profileRevision) !== null,
+	);
 
 const operationSchema = z
 	.object({
@@ -65,6 +69,10 @@ const operationSchema = z
 const operationsSchema = z
 	.array(operationSchema)
 	.max(approvedSalesProfile.maxOperations);
+
+export const extractionOutput = z
+	.object({ operations: operationsSchema })
+	.strict();
 export type SalesOperation = z.infer<typeof operationSchema>;
 export type SalesExtractionInput = {
 	source: string;
@@ -173,9 +181,7 @@ async function localModel(
 		maxOutputTokens: request.maxOutputTokens,
 		maxRetries: 0,
 		temperature: 0,
-		output: Output.object({
-			schema: z.object({ operations: operationsSchema }).strict(),
-		}),
+		output: Output.object({ schema: extractionOutput }),
 	});
 	authorize();
 	if (result.finishReason !== "stop")

@@ -14,6 +14,7 @@ import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { AgentModel, type AgentModelMode } from "./agent-model";
 import { ArchiveRetention } from "./archive-retention";
+import { CodexConnection } from "./codex-connection";
 import { ResearchKey } from "./research-key";
 import { WorkspaceForm } from "./workspace-form";
 
@@ -63,6 +64,7 @@ async function Settings() {
 			: []),
 		queryClient.prefetchQuery(trpc.settings.researchKey.queryOptions()),
 		queryClient.prefetchQuery(trpc.settings.archiveRetention.queryOptions()),
+		queryClient.prefetchQuery(trpc.codex.status.queryOptions()),
 	]);
 
 	return (
@@ -72,6 +74,7 @@ async function Settings() {
 				<ResearchKey />
 				<ArchiveRetention />
 				<AgentModel mode={mode} />
+				<CodexConnection />
 			</div>
 		</HydrateClient>
 	);
