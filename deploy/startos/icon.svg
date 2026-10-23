@@ -1,1 +1,9 @@
-../../apps/app/public/favicon.svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#F9F7F2"/>
+  <g fill="none" stroke="#26201A" stroke-width="2">
+    <rect x="5" y="5" width="22" height="22"/>
+    <line x1="16" y1="5" x2="16" y2="27"/>
+    <line x1="5" y1="16" x2="27" y2="16"/>
+  </g>
+  <rect x="16" y="5" width="11" height="11" fill="#A03E0F"/>
+</svg>

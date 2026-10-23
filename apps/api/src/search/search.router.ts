@@ -3,6 +3,10 @@ import { Input, Query, Router, UseMiddlewares } from "nestjs-trpc";
 import { z } from "zod";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
+import {
+	resolveCustomerInput,
+	resolveCustomerOutput,
+} from "./search.contracts";
 import { SearchService } from "./search.service";
 
 const quickInput = z.object({ q: z.string().default("") });
@@ -24,6 +28,15 @@ const quickOutput = z.object({ hits: z.array(searchHitOutput) });
 @UseMiddlewares(AuthMiddleware)
 export class SearchRouter {
 	constructor(@Inject(SearchService) private readonly search: SearchService) {}
+
+	@Query({
+		input: resolveCustomerInput,
+		output: resolveCustomerOutput,
+		meta: restMeta("GET", "/search/resolve-customer", ["Search"]),
+	})
+	async resolveCustomer(@Input() input: z.infer<typeof resolveCustomerInput>) {
+		return this.search.resolveCustomer(input);
+	}
 
 	@Query({
 		input: quickInput,

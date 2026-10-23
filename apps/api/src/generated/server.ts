@@ -13,7 +13,7 @@ import { z } from "zod";
 
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
-import { timelineInput, timelineOutput, timelineCountsInput, timelineCountsOutput, myTasksInput, myTasksOutput, activityCreateInput, activityCreateOutput, completeInput, completeOutput } from "../activities/activities.contracts";
+import { timelineInput, timelineOutput, timelineCountsInput, timelineCountsOutput, myTasksInput, myTasksOutput, followUpsInput, followUpsOutput, activityCreateInput, activityCreateOutput, completeInput, completeOutput } from "../activities/activities.contracts";
 import { agentListOutput, agentReviseInput, agentReviseOutput, agentIdInput, agentFilesOutput, agentSaveFileInput, agentSaveFileOutput, agentByIdOutput, agentHistoryInput, agentHistoryOutput, agentActivityOutput, agentUpdateInput, agentUpdateOutput, agentDeployInput, agentDeployOutput, agentPauseOutput, agentResumeOutput, agentArchiveOutput, agentRestoreOutput, agentRemoveOutput, agentRunNowInput, agentRunNowOutput, agentRetryRunInput, agentRetryRunOutput, agentCancelRunInput, agentCancelRunOutput } from "../agent/agents.contracts";
 import { apiKeyListInput, apiKeyListOutput, createApiKeyInput, createApiKeyOutput, revokeApiKeyInput, revokeApiKeyOutput } from "../api-keys/api-keys.contracts";
 import { codexStatusOutput, codexModelsOutput, codexSignInOutput, codexPollOutput, codexConnectApiKeyInput, codexSetModelInput } from "../codex/codex.contracts";
@@ -30,6 +30,7 @@ import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOut
 import { salesRequestInput, salesRequestIdInput, salesSubmitInput, salesApproveInput } from "@crm/validation/sales";
 import { salesRequestOutput, salesPendingInput, salesPendingOutput, salesProposalOutput } from "../sales/sales.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
+import { resolveCustomerInput, resolveCustomerOutput } from "../search/search.contracts";
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput } from "../settings/settings.contracts";
 import { slackStatusOutput, slackMatchesOutput, slackChannelsInput, slackChannelsOutput, slackJoinChannelInput, slackJoinChannelOutput, slackRefreshPeopleOutput, slackCreateChannelInput, slackCreateChannelOutput, slackDisconnectOutput } from "../slack/slack.contracts";
 import { ssoSignInOptionsOutput, ssoSettingsOutput, ssoProviderListInput, ssoProviderListOutput, registerSsoProviderInput, ssoProviderOutput, deleteSsoProviderInput, deleteSsoProviderOutput } from "../sso/sso.contracts";
@@ -50,6 +51,10 @@ const appRouter = t.router({
     myTasks: publicProcedure
       .input(myTasksInput)
       .output(myTasksOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    followUps: publicProcedure
+      .input(followUpsInput)
+      .output(followUpsOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     create: publicProcedure
       .input(activityCreateInput)
@@ -649,6 +654,10 @@ const appRouter = t.router({
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   search: t.router({
+    resolveCustomer: publicProcedure
+      .input(resolveCustomerInput)
+      .output(resolveCustomerOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     quick: publicProcedure
       .input(z.object({ q: z.string().default("") }))
       .output(z.object({ hits: z.array(z.object({

@@ -6,18 +6,26 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common";
+import { z } from "zod";
 import { ActivityStampService } from "../crm/activity-stamp.service";
 import { blankToNull } from "../crm/values";
 import { InjectDatabase } from "../database/database.constants";
+import { readSnapshot } from "../database/read-snapshot";
 import type {
 	ActivityCreateInput,
 	ActivityEntry,
+	FollowUpCategory,
+	FollowUpsCursor,
+	FollowUpsInput,
+	FollowUpsResult,
 	MyTasksInput,
 	TimelineCounts,
 	TimelineFilter,
 	TimelineInput,
 	TimelineResult,
 } from "./activities.contracts";
+import { followUpsCursor } from "./activities.contracts";
+import { addLocalDays, localDateAt, localDayStart } from "./local-day";
 
 const AUTHOR_SELECT = {
 	id: true,
@@ -214,6 +222,132 @@ export class ActivitiesService {
 		return tasks.map(serializeEntry);
 	}
 
+	async followUps(
+		input: FollowUpsInput,
+		actingUserId: string,
+	): Promise<FollowUpsResult> {
+		const cursor = input.cursor ? decodeFollowUpsCursor(input.cursor) : null;
+		const asOf = new Date(input.asOf ?? cursor?.asOf ?? new Date());
+		const asOfIso = asOf.toISOString();
+		if (
+			cursor &&
+			(cursor.asOf !== asOfIso ||
+				cursor.timeZone !== input.timeZone ||
+				cursor.days !== input.days ||
+				cursor.createdById !== actingUserId)
+		) {
+			throw new BadRequestException(
+				"The cursor does not match the follow-up parameters or caller.",
+			);
+		}
+		const date = localDateAt(asOf, input.timeZone);
+		const todayStart = localDayStart(date, input.timeZone);
+		const tomorrowStart = localDayStart(addLocalDays(date, 1), input.timeZone);
+		const windowEnd = localDayStart(
+			addLocalDays(date, 1 + input.days),
+			input.timeZone,
+		);
+		if (
+			!(
+				todayStart.getTime() <= asOf.getTime() &&
+				asOf.getTime() < tomorrowStart.getTime() &&
+				tomorrowStart.getTime() <= windowEnd.getTime()
+			)
+		) {
+			throw new BadRequestException(
+				"The time zone and asOf do not produce ordered local day boundaries.",
+			);
+		}
+		const base: Prisma.ActivityWhereInput = {
+			type: ActivityType.TASK,
+			completedAt: null,
+			createdById: actingUserId,
+			AND: [
+				{ OR: [{ companyId: null }, { company: { archivedAt: null } }] },
+				{ OR: [{ contactId: null }, { contact: { archivedAt: null } }] },
+				{ OR: [{ dealId: null }, { deal: { archivedAt: null } }] },
+			],
+		};
+		const categories = {
+			overdue: { dueAt: { lt: asOf } },
+			due_today: { dueAt: { gte: asOf, lt: tomorrowStart } },
+			next_days: { dueAt: { gte: tomorrowStart, lt: windowEnd } },
+			later: { dueAt: { gte: windowEnd } },
+			undated: { dueAt: null },
+		} satisfies Record<FollowUpCategory, Prisma.ActivityWhereInput>;
+		return readSnapshot(this.db, async (tx) => {
+			const timestamp = z
+				.array(z.object({ countedAt: z.date() }))
+				.parse(
+					await tx.$queryRaw`SELECT transaction_timestamp() AS "countedAt"`,
+				);
+			const countedAt = timestamp[0]?.countedAt.toISOString();
+			if (!countedAt) throw new Error("The read snapshot has no timestamp.");
+			const [rows, overdue, dueToday, nextDays, later, undated, total] =
+				await Promise.all([
+					tx.activity.findMany({
+						where: { AND: [base, cursor ? afterFollowUpsCursor(cursor) : {}] },
+						take: input.limit + 1,
+						orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { id: "asc" }],
+						select: ENTRY_SELECT,
+					}),
+					tx.activity.count({ where: { AND: [base, categories.overdue] } }),
+					tx.activity.count({ where: { AND: [base, categories.due_today] } }),
+					tx.activity.count({ where: { AND: [base, categories.next_days] } }),
+					tx.activity.count({ where: { AND: [base, categories.later] } }),
+					tx.activity.count({ where: { AND: [base, categories.undated] } }),
+					tx.activity.count({ where: base }),
+				]);
+			const page = rows.slice(0, input.limit);
+			const last = page[page.length - 1];
+			return {
+				asOf: asOfIso,
+				timeZone: input.timeZone,
+				days: input.days,
+				scope: "created_by_caller",
+				boundaries: {
+					todayStart: todayStart.toISOString(),
+					tomorrowStart: tomorrowStart.toISOString(),
+					windowEnd: windowEnd.toISOString(),
+				},
+				counts: {
+					overdue,
+					due_today: dueToday,
+					next_days: nextDays,
+					later,
+					undated,
+					total,
+				},
+				countedAt,
+				items: page.map((row) => ({
+					category: followUpCategoryOf(
+						row.dueAt,
+						asOf,
+						tomorrowStart,
+						windowEnd,
+					),
+					dueLocalDate: row.dueAt
+						? localDateAt(row.dueAt, input.timeZone)
+						: null,
+					task: serializeEntry(row),
+				})),
+				nextCursor:
+					rows.length > input.limit && last
+						? Buffer.from(
+								JSON.stringify({
+									asOf: asOfIso,
+									timeZone: input.timeZone,
+									days: input.days,
+									createdById: actingUserId,
+									dueAt: last.dueAt?.toISOString() ?? null,
+									id: last.id,
+								} satisfies FollowUpsCursor),
+							).toString("base64url")
+						: null,
+			};
+		});
+	}
+
 	private anchor(
 		input: Pick<TimelineInput, "companyId" | "contactId" | "dealId">,
 	): Prisma.ActivityWhereInput {
@@ -306,6 +440,46 @@ function serializeEntry(entry: Entry) {
 				}
 			: null,
 	};
+}
+
+function decodeFollowUpsCursor(encoded: string): FollowUpsCursor {
+	try {
+		if (!/^[A-Za-z0-9_-]+$/.test(encoded))
+			throw new Error("Invalid base64url.");
+		const bytes = Buffer.from(encoded, "base64url");
+		if (bytes.toString("base64url") !== encoded)
+			throw new Error("Invalid base64url.");
+		return followUpsCursor.parse(JSON.parse(bytes.toString("utf8")));
+	} catch {
+		throw new BadRequestException("Invalid follow-up cursor.");
+	}
+}
+
+function afterFollowUpsCursor(
+	cursor: FollowUpsCursor,
+): Prisma.ActivityWhereInput {
+	if (cursor.dueAt === null) return { dueAt: null, id: { gt: cursor.id } };
+	const dueAt = new Date(cursor.dueAt);
+	return {
+		OR: [
+			{ dueAt: { gt: dueAt } },
+			{ dueAt, id: { gt: cursor.id } },
+			{ dueAt: null },
+		],
+	};
+}
+
+function followUpCategoryOf(
+	dueAt: Date | null,
+	asOf: Date,
+	tomorrowStart: Date,
+	windowEnd: Date,
+): FollowUpCategory {
+	if (dueAt === null) return "undated";
+	if (dueAt < asOf) return "overdue";
+	if (dueAt < tomorrowStart) return "due_today";
+	if (dueAt < windowEnd) return "next_days";
+	return "later";
 }
 
 function parseDate(value: string | null | undefined): Date | null {

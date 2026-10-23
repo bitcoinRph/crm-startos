@@ -18,7 +18,10 @@ import {
 } from "@trpc/server/unstable-core-do-not-import";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { SALES_MCP_SCOPES, salesKeyAllows } from "../sales/sales.auth";
+import { authorizeApiKeyProcedure } from "../trpc/api-key-access";
 import type { BaseTrpcContext } from "../trpc/context.types";
+import { verifiedApiKey } from "../trpc/middlewares/auth.middleware";
 import { createBaseTrpcContext } from "../trpc/trpc.context";
 import { MCP_TOOLS } from "./mcp-tools";
 
@@ -144,9 +147,21 @@ export function createMcpBridge(router: AnyRouter): McpBridge {
 		const tools = await bound;
 		const server = new Server(SERVER_INFO, { capabilities: { tools: {} } });
 
-		server.setRequestHandler(ListToolsRequestSchema, async () => ({
-			tools: [...tools.values()].map((entry) => entry.tool),
-		}));
+		const userId = ctx.session.user.id;
+		server.setRequestHandler(ListToolsRequestSchema, async () => {
+			const key = await verifiedApiKey(ctx, userId);
+			const visible = [...tools.values()].filter((entry) => {
+				if (!key) return true;
+				const decision = authorizeApiKeyProcedure(key, entry.path, entry.type);
+				if (decision !== "sales") return decision !== "deny";
+				const scopes = SALES_MCP_SCOPES.get(entry.path);
+				return (
+					scopes?.every((scope) => salesKeyAllows(key.permissions, scope)) ??
+					false
+				);
+			});
+			return { tools: visible.map((entry) => entry.tool) };
+		});
 
 		server.setRequestHandler(CallToolRequestSchema, (request) =>
 			callTool(router, ctx, tools, request.params, logger),
