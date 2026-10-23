@@ -1,3 +1,4 @@
+import { finished } from "node:stream/promises";
 import { API_KEY_HEADER, API_KEY_PREFIX } from "@crm/auth";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -133,11 +134,31 @@ export function createMcpBridge(router: AnyRouter): McpBridge {
 	const bound = bindTools(router);
 
 	return async (req, res) => {
+		if (req.method !== "POST") {
+			res
+				.status(405)
+				.set("Allow", "POST")
+				.json({
+					jsonrpc: "2.0",
+					error: { code: -32000, message: "Method not allowed." },
+					id: null,
+				});
+			return;
+		}
+
 		acceptBearerApiKey(req);
 
 		const ctx = await createBaseTrpcContext(req);
 
 		if (!ctx.session) {
+			try {
+				const drained = finished(req, { cleanup: true });
+				req.resume();
+				await drained;
+			} catch {
+				res.destroy();
+				return;
+			}
 			res.status(401).json({
 				error: `Send a CRM API key in the ${API_KEY_HEADER} header or as a Bearer token.`,
 			});

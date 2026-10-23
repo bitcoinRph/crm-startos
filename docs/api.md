@@ -183,10 +183,13 @@ middlewares as the app. It is a wire format, not a second data surface.
 - **An API key is the credential.** The bridge resolves the session the way
   `createBaseTrpcContext` does, and additionally accepts the key as
   `Authorization: Bearer crm_…` because some MCP clients can only send that
-  header. No key, no session, `401` — before any JSON-RPC is parsed.
+  header. A POST without a key or session returns `401` before any JSON-RPC is parsed.
+  The bridge discards rejected POST bytes without parsing them before completing the response.
+  An aborted upload closes its response.
 - **Stateless, JSON responses.** One `Server` per request, no session ids, no
   SSE, so the endpoint works through the app's `/api/*` proxy and through
-  reverse proxies that buffer.
+  reverse proxies that buffer. GET and DELETE return `405` with `Allow: POST` before authentication.
+  The endpoint offers no GET notification stream or resumable session.
 - **Not every procedure belongs in the list.** Bulk operations, purges, API-key
   management, SSO and tracking settings stay out. Adding a tool is one entry in
   `mcp-tools.ts`; adding a destructive one is a review question.

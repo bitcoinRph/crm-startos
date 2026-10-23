@@ -9,6 +9,8 @@ import {
 	spyOn,
 } from "bun:test";
 import { randomUUID } from "node:crypto";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { setImmediate } from "node:timers/promises";
 import { auth } from "@crm/auth";
 import { db } from "@crm/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -182,6 +184,193 @@ afterAll(async () => {
 });
 
 describe("MCP contract", () => {
+	it("drains rejected POST bytes without parsing JSON-RPC", async () => {
+		let drained: boolean | undefined;
+		const observe = (request: IncomingMessage, response: ServerResponse) => {
+			if (request.headers["x-fixture-request"] !== prefix) return;
+			response.once("finish", () => {
+				drained = request.readableEnded;
+			});
+		};
+		const server = app.getHttpServer();
+		server.prependListener("request", observe);
+		try {
+			const response = await fetch(endpoint, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-fixture-request": prefix,
+				},
+				body: JSON.stringify({ padding: prefix }).slice(0, -1),
+			});
+			expect(response.status).toBe(401);
+			expect(
+				z.object({ error: z.string() }).parse(await response.json()).error,
+			).toContain("API key");
+			expect(drained).toBe(true);
+		} finally {
+			server.off("request", observe);
+		}
+	});
+
+	it("rejects unauthenticated GET without starting a stream", async () => {
+		const response = await fetch(endpoint);
+		expect(response.status).toBe(405);
+		expect(response.headers.get("allow")).toBe("POST");
+		expect(await response.json()).toEqual({
+			jsonrpc: "2.0",
+			error: { code: -32000, message: "Method not allowed." },
+			id: null,
+		});
+	});
+
+	it("rejects GET and DELETE independently of key validity without checking auth", async () => {
+		const key = await createKey("agent_read");
+		await fixture.api.deleteApiKey({
+			headers: new Headers({ cookie }),
+			body: { keyId: key.id },
+		});
+		const sessionCalls = sessionSpy.mock.calls.length;
+		const verifyCalls = verifySpy.mock.calls.length;
+		const credentials: NonNullable<RequestInit["headers"]>[] = [
+			{},
+			{ "x-api-key": readerKey.key },
+			{ authorization: `Bearer ${readerKey.key}` },
+			{ "x-api-key": key.key },
+			{ "x-api-key": "crm_invalid_fixture_key" },
+		];
+		for (const headers of credentials) {
+			for (const method of ["GET", "DELETE"]) {
+				const response = await fetch(endpoint, { method, headers });
+				expect(response.status).toBe(405);
+				expect(response.headers.get("allow")).toBe("POST");
+				expect(response.headers.get("content-type")).toContain(
+					"application/json",
+				);
+				expect(await response.json()).toEqual({
+					jsonrpc: "2.0",
+					error: { code: -32000, message: "Method not allowed." },
+					id: null,
+				});
+			}
+		}
+		expect(sessionSpy.mock.calls.length).toBe(sessionCalls);
+		expect(verifySpy.mock.calls.length).toBe(verifyCalls);
+	});
+
+	it("keeps authenticated POST tool discovery JSON-only and stateless", async () => {
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"x-api-key": readerKey.key,
+				"content-type": "application/json",
+				accept: "application/json, text/event-stream",
+			},
+			body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+		});
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-type")).toContain("application/json");
+		expect(response.headers.get("mcp-session-id")).toBeNull();
+		const result = z
+			.object({
+				result: z.object({ tools: z.array(z.object({ name: z.string() })) }),
+			})
+			.parse(await response.json());
+		expect(result.result.tools.some((tool) => tool.name === "whoami")).toBe(
+			true,
+		);
+	});
+
+	it("rejects a background GET released after revocation without a client error", async () => {
+		let releaseGet!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			releaseGet = resolve;
+		});
+		let recordGet!: (status: number) => void;
+		const recorded = new Promise<number>((resolve) => {
+			recordGet = resolve;
+		});
+		const key = await createKey("agent_read");
+		const client = new Client({ name: "crm-revocation-fixture", version: "1" });
+		const errors: Error[] = [];
+		client.onerror = (error) => errors.push(error);
+		clients.push(client);
+		try {
+			await client.connect(
+				new StreamableHTTPClientTransport(endpoint, {
+					requestInit: { headers: { "x-api-key": key.key } },
+					fetch: async (input, init) => {
+						if (init?.method === "GET") await gate;
+						const response = await fetch(input, init);
+						if (init?.method === "GET") {
+							const body = response.body;
+							if (body) {
+								const cancel = body.cancel.bind(body);
+								body.cancel = async (reason) => {
+									await cancel(reason);
+									recordGet(response.status);
+								};
+							} else {
+								recordGet(response.status);
+							}
+						}
+						return response;
+					},
+				}),
+			);
+			await fixture.api.deleteApiKey({
+				headers: new Headers({ cookie }),
+				body: { keyId: key.id },
+			});
+			releaseGet();
+			expect(await recorded).toBe(405);
+			await setImmediate();
+			await client.close();
+			const response = await fetch(endpoint, {
+				method: "POST",
+				headers: { "x-api-key": key.key, "content-type": "application/json" },
+				body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+			});
+			expect(response.status).toBe(401);
+			expect(
+				z.object({ error: z.string() }).parse(await response.json()).error,
+			).toContain("API key");
+			expect(errors).toEqual([]);
+		} finally {
+			releaseGet();
+			await client.close();
+		}
+	});
+
+	it("closes an aborted unauthenticated POST during body draining", async () => {
+		const controller = new AbortController();
+		const observe = (request: IncomingMessage) => {
+			if (request.headers["x-fixture-request"] !== prefix) return;
+			request.once("resume", () => controller.abort());
+		};
+		const server = app.getHttpServer();
+		server.prependListener("request", observe);
+		try {
+			const response = fetch(endpoint, {
+				method: "POST",
+				headers: { "x-fixture-request": prefix },
+				signal: controller.signal,
+				body: new ReadableStream<Uint8Array>({
+					start(stream) {
+						stream.enqueue(new TextEncoder().encode("{"));
+					},
+				}),
+			}).then(
+				() => false,
+				() => true,
+			);
+			expect(await response).toBe(true);
+		} finally {
+			controller.abort();
+			server.off("request", observe);
+		}
+	});
+
 	it("M1 excludes archived contacts, companies and deals without a parent cascade", async () => {
 		const archivedCompany = `${prefix}-archived-company`;
 		const archivedContact = `${prefix}-archived-contact`;
