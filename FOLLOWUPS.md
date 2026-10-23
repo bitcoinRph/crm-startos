@@ -10,6 +10,8 @@ one is a separate PR. Written in ASD-STE100 per `AGENTS.md`.
 | Capability | MCP tool | tRPC procedure | REST (`/rest`, API port only) |
 | --- | --- | --- | --- |
 | Search | `search_crm` | `search.quick` | `GET /search` |
+| Exact customer lookup | `resolve_customer` | `search.resolveCustomer` | `GET /search/resolve-customer` |
+| Creator follow-ups | `follow_ups` | `activities.followUps` | `GET /activities/follow-ups` |
 | Read a record | `get_contact`, `get_company`, `get_deal`, `timeline`, `my_tasks`, `dashboard_summary`, `whoami`, `list_*` | same | same |
 | Change a record | `create_*`, `update_*`, `set_deal_stage`, `attach_contact_to_deal`, `log_activity`, `complete_task`, `enrich_*` | same | same |
 | Sales proposals | `sales_create_request`, `sales_get_request`, `sales_pending_requests`, `sales_store_proposal`, `sales_fail_request` | `sales.*` | `/sales/*` |
@@ -28,10 +30,10 @@ one is a separate PR. Written in ASD-STE100 per `AGENTS.md`.
 
 ### Minimal tool set per profile
 
-`agent_read` needs 11 tools; `agent_propose` those plus the 5 sales tools;
-`crm_integration` everything in the list. A future change filters `tools/list`
-by the key's profile so an agent never sees a tool it cannot call.
-Verification: an MCP `tools/list` per profile in a bridge test.
+Implemented: `tools/list` filters by the key's stored permissions and the existing enforcement functions.
+Sales tools require every scope that their router enforces. Legacy keys see no sales tool.
+Cookie sessions see every allow-listed tool. Hidden calls still pass through server authorization.
+Verification: bridge tests cover all profiles, legacy keys, cookie sessions, and every hidden reader or legacy call.
 
 ### Audit log per key
 

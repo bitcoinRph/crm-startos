@@ -183,13 +183,61 @@ middlewares as the app. It is a wire format, not a second data surface.
 - **An API key is the credential.** The bridge resolves the session the way
   `createBaseTrpcContext` does, and additionally accepts the key as
   `Authorization: Bearer crm_…` because some MCP clients can only send that
-  header. No key, no session, `401` — before any JSON-RPC is parsed.
+  header. A POST without a key or session returns `401` before any JSON-RPC is parsed.
+  The bridge discards rejected POST bytes without parsing them before completing the response.
+  An aborted upload closes its response.
 - **Stateless, JSON responses.** One `Server` per request, no session ids, no
   SSE, so the endpoint works through the app's `/api/*` proxy and through
-  reverse proxies that buffer.
+  reverse proxies that buffer. GET and DELETE return `405` with `Allow: POST` before authentication.
+  The endpoint offers no GET notification stream or resumable session.
 - **Not every procedure belongs in the list.** Bulk operations, purges, API-key
   management, SSO and tracking settings stay out. Adding a tool is one entry in
   `mcp-tools.ts`; adding a destructive one is a review question.
+- **Tool discovery follows enforcement.** `tools/list` filters by the key's stored permissions.
+  Sales tools also require every scope that their router enforces.
+  A cookie session sees the full allow-list. `tools/call` still checks every call.
+  A valid key takes precedence over a different user's cookie through Better Auth's existing key-session contract.
+  Discovery and calls use that key's owner and permissions. No new mismatch rule changes this contract.
+- **`search_crm` returns active records only.** Companies match name or domain; contacts match name or email; deals match name.
+  Each kind returns at most five substring matches. The same filter applies to quick search (⌘K).
+  Use the Archived view for archived records. The filter checks each row, without a parent cascade.
+- **`resolve_customer` is exact lookup, not identity inference.** Pass exactly one email or domain.
+  Use `search_crm` for names. Existing `get_*` tools cover record IDs.
+  Emails use `normalizeEmail` and parameterized `lower(email) = value` equality. Wildcards remain literal characters.
+  No plus-tag or dot stripping occurs. Lookup retains strict Zod email validation.
+  Nonstandard stored values such as `ana@localhost` return `invalid`. Use `get_contact` with the literal ID instead.
+  Raw email input accepts at most 320 characters, including surrounding whitespace.
+  Raw domain input accepts at most 2048 characters, including any URL path.
+  These request bounds limit parsing and database work. They do not change stored values or business policy.
+  `matchType` compares the stored email with the original input spelling, before trimming or lowercasing.
+  Domains use `normalizeDomain` and exact equality. No free-mail special case applies.
+  Results contain `resolved`, `ambiguous`, `not_found` or `invalid`, up to 25 matches, and `truncated`.
+  The default selects active records. `archived: true` selects archived records only, without hidden-archive hints.
+- **`follow_ups` reads open tasks that the caller creates.** `timeZone` and `days` are required.
+  `timeZone` uses an IANA name. `days` accepts 1–31. `limit` accepts 1–100 and defaults to 25.
+  Optional `asOf` accepts an ISO datetime with an offset. It defaults to server now and returns in the response.
+  `asOf` supports instants from `0002-01-01T00:00:00Z` inclusive to `9999-01-01T00:00:00Z` exclusive.
+  UTC years 0002–9998 reserve representational margins within four-digit Gregorian years.
+  Those margins cover timezone shifts, the maximum 32-date window, and the boundary search bracket.
+  This technical range does not define business deadlines. Offset timestamps use their UTC instant for validation.
+  Explicit timestamps and cursor timestamps use the same range. Unsupported instants return `BAD_REQUEST`.
+  Timestamp strings and IANA names each accept at most 64 characters.
+  Ordered boundaries satisfy `todayStart ≤ asOf < tomorrowStart ≤ windowEnd`. Invalid boundaries return `BAD_REQUEST` before database reads.
+  Boundaries use local date starts, including daylight-saving transitions. Categories compare stored instants, not calendar-day intentions.
+  `overdue` means `dueAt < asOf`. `due_today` means the remaining day: `asOf ≤ dueAt < tomorrowStart`.
+  `next_days` means `tomorrowStart ≤ dueAt < windowEnd`. `windowEnd` starts the local date after the next `days` dates.
+  `later` means `dueAt ≥ windowEnd`. `undated` means no `dueAt`.
+  A UI calendar-day task stores local midnight. It becomes overdue once that instant passes.
+  This query does not change `my_tasks`, the dashboard, stored deadlines, or legacy data.
+  Tasks with any directly linked archived company, contact or deal are excluded. No parent cascade applies.
+  Each item includes its category, local due date and existing activity entry.
+  Each request reads items, category counts and total inside one read-only, repeatable-read transaction.
+  `countedAt` records the transaction timestamp. Counts cover all pages, not only the returned items.
+  Ordering uses `dueAt` ascending, nulls last, then ID ascending.
+  The base64url JSON cursor binds the caller, `asOf`, `timeZone`, `days`, last deadline and last ID.
+  A mismatched or malformed cursor returns `BAD_REQUEST`. An omitted `asOf` reuses the cursor instant.
+  Each page reads current records. The cursor does not preserve a historical snapshot across requests.
+  These queries also expose `GET /rest/search/resolve-customer` and `GET /rest/activities/follow-ups` on the API port.
 
 ### An API key carries a profile
 
@@ -209,8 +257,8 @@ from the stored permissions, never from the request.
   a read needs `crm:read` or `sales:read`, a proposal needs
   `sales:proposal:write`, and approval needs a human session, never a key.
 - **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
-- **A key created before profiles has no permissions and keeps full access.**
-  The table shows it as *Legacy: full access* so the owner can rotate it.
+- **A legacy key has null permissions.** It keeps non-sales CRM access. Every `sales.*` call requires explicit permissions.
+  The existing table label says *Legacy: full access*. The owner rotates the key; discovery does not grant permissions.
 - **The profile name says what the key can do, not which agent holds it.** The
   free-text `name` is where "hermes" or "openclaw" goes.
 - **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
