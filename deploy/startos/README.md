@@ -44,9 +44,9 @@ Built packages are published on the repository's [Releases](https://github.com/b
 
 Download one, open your StartOS device in a browser, then click **Sideload** in the top navigation bar and select it.
 
-`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**, then publishes them. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
+`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**. Only runs on `release` publish packages. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
 
-The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one, so **raise that version before merging whenever an existing install has to update**. A merge that leaves it alone replaces the files on the existing release instead of publishing a new one, which is what a fresh install wants and what an update cannot use.
+The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one. Raise that version for each package release. Publication creates a new draft and publishes it after uploading both architectures and checksums. An existing release tag stops publication. The workflow never replaces existing assets.
 
 To build locally instead, install [Docker](https://docs.docker.com/engine/install/), Node.js 22 or newer and [`start-cli`](https://start9.com/start-cli/install.sh), create a packaging workspace once in the directory that holds the clone, then build from this directory:
 
