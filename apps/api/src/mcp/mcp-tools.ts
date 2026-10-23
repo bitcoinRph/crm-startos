@@ -39,7 +39,13 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "search_crm",
 		procedure: "search.quick",
 		description:
-			"Find companies, contacts and deals whose name, email or domain contains the text. Returns each hit's kind and id, which the other tools take as input.",
+			"Find active records only, with at most 5 per kind. Companies match name or domain; contacts match name or email; deals match name. Matches contain the text. Returns each hit's kind and id.",
+	},
+	{
+		name: "resolve_customer",
+		procedure: "search.resolveCustomer",
+		description:
+			"Look up exactly one email or domain. Use search_crm for names and get_contact or get_company for ids. Email equality is literal and case-insensitive, without plus-tag or dot stripping or company inference. Strict email validation returns invalid for nonstandard stored values such as ana@localhost; use get_contact with the literal id. matchType compares the stored email with the original input spelling. Domains use existing URL/domain normalization and exact stored-domain equality. Returns resolved, ambiguous, not_found or invalid, at most 25 matches, and truncated. Active records only by default. archived true selects archived records only, without hidden-archive hints.",
 	},
 	{
 		name: "whoami",
@@ -67,7 +73,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "list_contacts",
 		procedure: "contacts.list",
 		description:
-			"Page through contacts with search, sort, pagination and facet filters. Returns rows, the total and facet counts.",
+			"Page through contacts with search, sort, pagination and facet filters. Archived records are excluded unless archived is true, which returns archived records only. The lastActivity sort and activity filter use lastActivityAt. This timestamp records when an activity is logged, not when it occurred. Agent-written activities such as company research also move it. Returns rows, the total and facet counts.",
 	},
 	{
 		name: "get_contact",
@@ -97,7 +103,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "list_companies",
 		procedure: "companies.list",
 		description:
-			"Page through companies with search, sort, pagination and facet filters. Returns rows, the total and facet counts.",
+			"Page through companies with search, sort, pagination and facet filters. Archived records are excluded unless archived is true, which returns archived records only. The lastActivity sort and activity filter use lastActivityAt. This timestamp records when an activity is logged, not when it occurred. Agent-written activities such as company research also move it. Returns rows, the total and facet counts.",
 	},
 	{
 		name: "get_company",
@@ -127,7 +133,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "list_deals",
 		procedure: "deals.list",
 		description:
-			"Page through deals with search, sort, pagination and facet filters. Amounts are in cents; the open value is in the reporting currency.",
+			"Page through deals with search, sort, pagination and facet filters. Archived records are excluded unless archived is true, which returns archived records only. The lastActivity sort uses lastActivityAt. This timestamp records when an activity is logged, not when it occurred. Agent-written activities such as company research also move it. Amounts are in cents; the open value is in the reporting currency.",
 	},
 	{
 		name: "get_deal",
@@ -163,12 +169,19 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "timeline",
 		procedure: "activities.timeline",
 		description:
-			"The activity timeline of a company, contact or deal: notes, calls, emails, meetings, tasks and stage changes, newest first, with a cursor for the next page.",
+			"Read an activity timeline. Pass one id. dealId wins over contactId, which wins over companyId. Only activities stored with the selected id are returned. Returns a cursor for the next page.",
 	},
 	{
 		name: "my_tasks",
 		procedure: "activities.myTasks",
-		description: "Open tasks assigned to the caller, overdue or upcoming.",
+		description:
+			"Open tasks the caller created. No assignee exists. Overdue means dueAt is before now, compared as instants. Tasks on archived records are included.",
+	},
+	{
+		name: "follow_ups",
+		procedure: "activities.followUps",
+		description:
+			"Read open tasks the caller created. timeZone (IANA name) and days (1–31) are required. Categories compare stored instants: overdue is before asOf; due_today is the remaining local day, from asOf to tomorrowStart; next_days ends before windowEnd; later starts at windowEnd; undated has no dueAt. A UI task saved for a calendar day is stored as local midnight and becomes overdue once that instant passes. Tasks on archived linked records are excluded. Counts cover all pages from one read-only snapshot per request. asOf defaults to server now and is echoed back. Supported asOf instants have UTC years 0002–9998. Unsupported instants or invalid day boundaries return BAD_REQUEST. Reuse nextCursor with the same timeZone, days and asOf; omitted asOf reuses the cursor instant. The cursor binds the caller. Later pages use current records, not a historical snapshot.",
 	},
 	{
 		name: "log_activity",

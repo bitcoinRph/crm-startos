@@ -1,15 +1,27 @@
 import { auth } from "@crm/auth";
 import { TRPCError } from "@trpc/server";
+import { type ApiKeyPermissions, permits } from "../api-keys/api-key-profiles";
 import { keyFromHeaders } from "../trpc/api-key-access";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { SALES_SCOPES, type SalesActor } from "./sales.service";
 
-function permits(
-	permissions: Record<string, string[]> | null | undefined,
-	resource: string,
-	action: string,
+export const SALES_MCP_SCOPES = new Map<string, readonly string[]>([
+	["sales.getRequest", [SALES_SCOPES.read]],
+	["sales.pendingRequests", [SALES_SCOPES.read]],
+	["sales.createRequest", [SALES_SCOPES.write, SALES_SCOPES.read]],
+	["sales.storeProposal", [SALES_SCOPES.write, SALES_SCOPES.read]],
+	["sales.failRequest", [SALES_SCOPES.write, SALES_SCOPES.read]],
+]);
+
+export function salesKeyAllows(
+	permissions: ApiKeyPermissions | null | undefined,
+	scope: string,
 ): boolean {
-	return permissions?.[resource]?.includes(action) ?? false;
+	if (!permissions || scope === SALES_SCOPES.approve) return false;
+	return scope === SALES_SCOPES.read
+		? permits(permissions, "crm", "read") ||
+				permits(permissions, "sales", "read")
+		: permits(permissions, "sales", "proposal:write");
 }
 
 export async function salesActor(
@@ -37,13 +49,7 @@ export async function salesActor(
 				message: "Sales scope denied.",
 			});
 		}
-		const permissions = verified.key.permissions;
-		const allowed =
-			scope === SALES_SCOPES.read
-				? permits(permissions, "crm", "read") ||
-					permits(permissions, "sales", "read")
-				: permits(permissions, "sales", "proposal:write");
-		if (!allowed) {
+		if (!salesKeyAllows(verified.key.permissions, scope)) {
 			throw new TRPCError({
 				code: "FORBIDDEN",
 				message: "Sales scope denied.",

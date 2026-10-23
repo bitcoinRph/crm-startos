@@ -1,3 +1,4 @@
+import { finished } from "node:stream/promises";
 import { API_KEY_HEADER, API_KEY_PREFIX } from "@crm/auth";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -18,7 +19,10 @@ import {
 } from "@trpc/server/unstable-core-do-not-import";
 import type { Request, Response } from "express";
 import { z } from "zod";
+import { SALES_MCP_SCOPES, salesKeyAllows } from "../sales/sales.auth";
+import { authorizeApiKeyProcedure } from "../trpc/api-key-access";
 import type { BaseTrpcContext } from "../trpc/context.types";
+import { verifiedApiKey } from "../trpc/middlewares/auth.middleware";
 import { createBaseTrpcContext } from "../trpc/trpc.context";
 import { MCP_TOOLS } from "./mcp-tools";
 
@@ -130,11 +134,31 @@ export function createMcpBridge(router: AnyRouter): McpBridge {
 	const bound = bindTools(router);
 
 	return async (req, res) => {
+		if (req.method !== "POST") {
+			res
+				.status(405)
+				.set("Allow", "POST")
+				.json({
+					jsonrpc: "2.0",
+					error: { code: -32000, message: "Method not allowed." },
+					id: null,
+				});
+			return;
+		}
+
 		acceptBearerApiKey(req);
 
 		const ctx = await createBaseTrpcContext(req);
 
 		if (!ctx.session) {
+			try {
+				const drained = finished(req, { cleanup: true });
+				req.resume();
+				await drained;
+			} catch {
+				res.destroy();
+				return;
+			}
 			res.status(401).json({
 				error: `Send a CRM API key in the ${API_KEY_HEADER} header or as a Bearer token.`,
 			});
@@ -144,9 +168,21 @@ export function createMcpBridge(router: AnyRouter): McpBridge {
 		const tools = await bound;
 		const server = new Server(SERVER_INFO, { capabilities: { tools: {} } });
 
-		server.setRequestHandler(ListToolsRequestSchema, async () => ({
-			tools: [...tools.values()].map((entry) => entry.tool),
-		}));
+		const userId = ctx.session.user.id;
+		server.setRequestHandler(ListToolsRequestSchema, async () => {
+			const key = await verifiedApiKey(ctx, userId);
+			const visible = [...tools.values()].filter((entry) => {
+				if (!key) return true;
+				const decision = authorizeApiKeyProcedure(key, entry.path, entry.type);
+				if (decision !== "sales") return decision !== "deny";
+				const scopes = SALES_MCP_SCOPES.get(entry.path);
+				return (
+					scopes?.every((scope) => salesKeyAllows(key.permissions, scope)) ??
+					false
+				);
+			});
+			return { tools: visible.map((entry) => entry.tool) };
+		});
 
 		server.setRequestHandler(CallToolRequestSchema, (request) =>
 			callTool(router, ctx, tools, request.params, logger),

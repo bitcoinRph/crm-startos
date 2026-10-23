@@ -1,6 +1,7 @@
 import { ActivityType } from "@crm/db";
 import { activityMeta } from "@crm/validation/activity-meta";
 import { z } from "zod";
+import { ACTIVITIES } from "./activities-config";
 
 const COMPOSABLE_TYPES = [
 	ActivityType.NOTE,
@@ -181,3 +182,105 @@ export const myTasksOutput = z.array(activityEntryOutput);
 export const activityCreateOutput = activityEntryOutput;
 
 export const completeOutput = activityEntryOutput;
+
+const timeZoneInput = z
+	.string()
+	.min(1)
+	.max(ACTIVITIES.followUps.maxTimeZoneLength)
+	.refine(
+		(timeZone) => {
+			if (
+				timeZone.length > ACTIVITIES.followUps.maxTimeZoneLength ||
+				/^[+-]/.test(timeZone)
+			)
+				return false;
+			try {
+				new Intl.DateTimeFormat("en", { timeZone });
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		{ message: "timeZone must be an IANA time zone name." },
+	);
+
+const asOfInput = z.iso
+	.datetime({ offset: true })
+	.max(ACTIVITIES.followUps.maxAsOfLength)
+	.refine(
+		(value) =>
+			value.length <= ACTIVITIES.followUps.maxAsOfLength &&
+			Date.parse(value) >= Date.parse(ACTIVITIES.followUps.asOfMin) &&
+			Date.parse(value) < Date.parse(ACTIVITIES.followUps.asOfMaxExclusive),
+		{ message: "asOf must be within UTC years 0002 through 9998." },
+	);
+
+export const followUpsInput = z.strictObject({
+	timeZone: timeZoneInput,
+	days: z.number().int().min(1).max(ACTIVITIES.followUps.maxDays),
+	asOf: asOfInput.optional(),
+	limit: z
+		.number()
+		.int()
+		.min(1)
+		.max(ACTIVITIES.followUps.maxLimit)
+		.default(ACTIVITIES.followUps.defaultLimit),
+	cursor: z
+		.string()
+		.min(1)
+		.max(ACTIVITIES.followUps.maxCursorLength)
+		.optional(),
+});
+
+export type FollowUpsInput = z.infer<typeof followUpsInput>;
+
+export const followUpsCursor = z.strictObject({
+	asOf: asOfInput,
+	timeZone: timeZoneInput,
+	days: z.number().int().min(1).max(ACTIVITIES.followUps.maxDays),
+	createdById: z.string().min(1),
+	dueAt: z.iso.datetime().nullable(),
+	id: z.string().min(1),
+});
+
+export type FollowUpsCursor = z.infer<typeof followUpsCursor>;
+
+const followUpCategory = z.enum([
+	"overdue",
+	"due_today",
+	"next_days",
+	"later",
+	"undated",
+]);
+export type FollowUpCategory = z.infer<typeof followUpCategory>;
+
+export const followUpsOutput = z.object({
+	asOf: z.string(),
+	timeZone: z.string(),
+	days: z.number(),
+	scope: z.literal("created_by_caller"),
+	boundaries: z.object({
+		todayStart: z.string(),
+		tomorrowStart: z.string(),
+		windowEnd: z.string(),
+	}),
+	counts: z.object({
+		overdue: z.number(),
+		due_today: z.number(),
+		next_days: z.number(),
+		later: z.number(),
+		undated: z.number(),
+		total: z.number(),
+	}),
+	countedAt: z.string(),
+	items: z.array(
+		z.object({
+			category: followUpCategory,
+			dueLocalDate: z.string().nullable(),
+			task: activityEntryOutput,
+		}),
+	),
+	nextCursor: z.string().nullable(),
+});
+
+export type FollowUpsResult = z.infer<typeof followUpsOutput>;

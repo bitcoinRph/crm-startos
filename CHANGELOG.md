@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/bitcoinRph/crm-startos/compare/v1.18.0...v1.19.0) (2026-10-23)
+
+
+### Features
+
+* **api:** add trustworthy customer lookup and follow-ups with Freehold package icon ([#20](https://github.com/bitcoinRph/crm-startos/issues/20)) ([245cc02](https://github.com/bitcoinRph/crm-startos/commit/245cc0282b6f3ef8162dac291694f41db1426cb7))
+
 ## [1.18.0](https://github.com/bitcoinRph/crm-startos/compare/v1.17.1...v1.18.0) (2026-10-02)
 
 
