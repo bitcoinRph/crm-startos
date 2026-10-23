@@ -146,7 +146,7 @@ jobs:
             printf '```sh\nsha256sum -c checksums.txt --ignore-missing\n```\n\n'
             printf 'StartOS installs a package only when its version is higher than the installed one. '
             printf 'Merging again without raising `version` in `deploy/startos/startos/versions/current.ts` '
-            printf 'refreshes the files on this release rather than publishing a new one.\n'
+            printf 'fails publication rather than replacing an existing release.\n'
           } > notes.md
 
           cat notes.md
@@ -162,13 +162,22 @@ jobs:
 
           title="CRM $VERSION for StartOS"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$title" --notes-file notes.md
-          else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "$title" --notes-file notes.md
+          releases=$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          tags=$(gh api "repos/$GH_REPO/git/matching-refs/tags/$TAG" --jq ".[] | select(.ref == \"refs/tags/$TAG\") | .ref")
+          if [ -n "$releases" ] || [ -n "$tags" ]; then
+            printf 'Refusing to replace existing release or tag %s\n' "$TAG" >&2
+            exit 1
           fi
 
-          gh release upload "$TAG" dist/*.s9pk dist/checksums.txt --clobber
+          gh release create "$TAG" dist/*.s9pk dist/checksums.txt \
+            --target "$GITHUB_SHA" --title "$title" --notes-file notes.md --draft --latest=false
+          release_id=$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          if ! [[ "$release_id" =~ ^[0-9]+$ ]]; then
+            printf 'Expected exactly one new release for %s\n' "$TAG" >&2
+            exit 1
+          fi
+          gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
+            -F draft=false -F prerelease=false -f make_latest=false
 
           url="https://github.com/$GH_REPO/releases/tag/$TAG"
           echo "Published [$title]($url)." >> "$GITHUB_STEP_SUMMARY"

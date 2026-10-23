@@ -14,6 +14,8 @@ Password sign-in is on, so nothing outside your network is needed to get in. Goo
 
 ## Getting set up
 
+Package 1.19.0:0 includes verified customer lookup, follow-ups, and the official Freehold icon. Downloading a package does not update an installed service.
+
 1. Run **Set Sign-in Credentials**. Enter the email address you will use and leave the password empty to generate one. Copy both; the password is shown once.
 2. Start the service and open the **Web UI** interface. Sign in with the email and password from step 1. The first account to sign in owns the workspace.
 3. Complete the onboarding: name the workspace and enter your website. Research integrations remain optional and can be configured later.
