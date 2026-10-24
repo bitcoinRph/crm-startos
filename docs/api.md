@@ -263,6 +263,7 @@ from the stored permissions, never from the request.
   The existing table label says *Legacy: full access*. The owner rotates the key; discovery does not grant permissions.
 - **The profile name says what the key can do, not which agent holds it.** The
   free-text `name` is where "hermes" or "openclaw" goes.
+- **Each key is rate-limited.** `API_KEY_RATE_LIMIT` in `packages/auth/src/api-key-config.ts` allows 3,000 key checks per 60 s per key, and one tRPC or MCP call makes two checks. The count resets only after the key is idle for longer than the window, so a continuously busy agent can be paused for up to 60 s. A key over the limit gets `429` or `TOO_MANY_REQUESTS`, and other keys are not affected. Better Auth stores the numbers on each key row at creation, so changing them needs a migration that updates the `apikey` rows.
 - **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
   endpoint. `keyFromHeaders` normalises it before the session is resolved.
 

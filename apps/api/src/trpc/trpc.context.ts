@@ -1,9 +1,10 @@
 import { auth } from "@crm/auth";
 import { Injectable } from "@nestjs/common";
+import { APIError } from "better-auth/api";
 import { fromNodeHeaders } from "better-auth/node";
 import type { Request } from "express";
 import type { ContextOptions, TRPCContext } from "nestjs-trpc";
-import { keyFromHeaders } from "./api-key-access";
+import { apiKeyRateLimited, keyFromHeaders } from "./api-key-access";
 import type { BaseTrpcContext } from "./context.types";
 
 export async function createBaseTrpcContext(
@@ -14,7 +15,12 @@ export async function createBaseTrpcContext(
 	if (headers && key && !headers.has("x-api-key"))
 		headers.set("x-api-key", key);
 	const session = headers
-		? await auth.api.getSession({ headers }).catch(() => null)
+		? await auth.api.getSession({ headers }).catch((error) => {
+				if (error instanceof APIError && error.status === "TOO_MANY_REQUESTS") {
+					throw apiKeyRateLimited();
+				}
+				return null;
+			})
 		: null;
 	return { req, session };
 }

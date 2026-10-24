@@ -1,3 +1,4 @@
+export { API_KEY_RATE_LIMIT } from "./api-key-config";
 export {
 	API_KEY_EXPIRATION,
 	API_KEY_HEADER,

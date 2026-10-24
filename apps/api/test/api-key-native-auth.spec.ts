@@ -7,7 +7,7 @@ import {
 	mock,
 	spyOn,
 } from "bun:test";
-import { auth, DAY_SECONDS } from "@crm/auth";
+import { API_KEY_RATE_LIMIT, auth, DAY_SECONDS } from "@crm/auth";
 import type { Db } from "@crm/db";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -339,5 +339,90 @@ describe("ApiKeysService with the pinned plugin", () => {
 			expiresInDays: null,
 		});
 		expect(permanent.expiresAt).toBeNull();
+	});
+});
+
+async function exhaust(key: string, requests: number) {
+	for (let used = 0; used < requests; used++) {
+		const verified = await fixture.api.verifyApiKey({ body: { key } });
+		expect(verified.valid).toBe(true);
+	}
+}
+
+describe("API key rate limit", () => {
+	it("stores the configured limit on each new key", async () => {
+		const created = await createKey("agent_read");
+		const [row] = await fixture.api
+			.listApiKeys({
+				headers: new Headers({ cookie }),
+			})
+			.then((listed) => listed.apiKeys.filter((key) => key.id === created.id));
+		expect(row).toMatchObject({
+			rateLimitEnabled: true,
+			rateLimitTimeWindow: API_KEY_RATE_LIMIT.timeWindow,
+			rateLimitMax: API_KEY_RATE_LIMIT.maxRequests,
+		});
+	});
+
+	it("refuses one key past the limit and leaves another key working", async () => {
+		const limited = await createKey("agent_read");
+		const other = await createKey("agent_read");
+		await exhaust(limited.key, API_KEY_RATE_LIMIT.maxRequests);
+
+		const refused = await fixture.api.verifyApiKey({
+			body: { key: limited.key },
+		});
+		expect(refused.valid).toBe(false);
+		expect(refused.key).toBeNull();
+		expect(refused.error?.code).toBe("RATE_LIMITED");
+		await expect(
+			fixture.api.getSession({
+				headers: new Headers({ "x-api-key": limited.key }),
+			}),
+		).rejects.toMatchObject({ statusCode: 429 });
+
+		expect(
+			(await fixture.api.verifyApiKey({ body: { key: other.key } })).valid,
+		).toBe(true);
+	});
+
+	it("answers TOO_MANY_REQUESTS from the tRPC context and middleware", async () => {
+		const limited = await createKey("agent_read");
+		const other = await createKey("agent_read");
+		const sessionSpy = spyOn(auth.api, "getSession").mockImplementation(
+			fixture.api.getSession,
+		);
+		const verifySpy = spyOn(auth.api, "verifyApiKey").mockImplementation(
+			fixture.api.verifyApiKey,
+		);
+		try {
+			await exhaust(limited.key, API_KEY_RATE_LIMIT.maxRequests - 1);
+			const last = await createBaseTrpcContext({
+				headers: transports(limited.key)[0],
+			} as ExpressRequest);
+			expect(last.session?.user.id).toBe(userId);
+			await expect(
+				new AuthMiddleware().use({
+					ctx: last,
+					path: "contacts.list",
+					type: "query",
+					next: mock(async () => ({ ok: true, data: null })),
+				} as unknown as MiddlewareOptions),
+			).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+
+			for (const headers of transports(limited.key)) {
+				await expect(
+					createBaseTrpcContext({ headers } as ExpressRequest),
+				).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+			}
+
+			const fine = await createBaseTrpcContext({
+				headers: transports(other.key)[0],
+			} as ExpressRequest);
+			expect(fine.session?.user.id).toBe(userId);
+		} finally {
+			sessionSpy.mockRestore();
+			verifySpy.mockRestore();
+		}
 	});
 });

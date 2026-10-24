@@ -7,6 +7,7 @@ import {
 	HttpStatus,
 	Logger,
 } from "@nestjs/common";
+import { APIError } from "better-auth/api";
 import type { Request, Response } from "express";
 import { getRequestContext } from "./request-context";
 
@@ -23,10 +24,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 		const request = http.getRequest<Request>();
 		const response = http.getResponse<Response>();
 
-		const status =
-			exception instanceof HttpException
-				? exception.getStatus()
-				: HttpStatus.INTERNAL_SERVER_ERROR;
+		const status = statusOf(exception);
 		const requestId = getRequestContext()?.requestId;
 
 		this.log(exception, status, request);
@@ -61,6 +59,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 	}
 }
 
+function statusOf(exception: unknown): number {
+	if (exception instanceof HttpException) return exception.getStatus();
+	if (exception instanceof APIError) return exception.statusCode;
+	return HttpStatus.INTERNAL_SERVER_ERROR;
+}
+
 function routePattern(request: Request): string | null {
 	const route = (request as { route?: { path?: unknown } }).route;
 	return typeof route?.path === "string" ? route.path : null;
@@ -92,6 +96,10 @@ function body(
 }
 
 function exceptionBody(exception: unknown, status: number): ErrorBody {
+	if (exception instanceof APIError) {
+		return { statusCode: status, message: exception.message };
+	}
+
 	if (!(exception instanceof HttpException)) {
 		return { statusCode: status, message: "Internal server error" };
 	}

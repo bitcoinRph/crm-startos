@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { type ApiKeyPermissions, permits } from "../api-keys/api-key-profiles";
 
@@ -7,6 +8,13 @@ export type VerifiedApiKey = {
 };
 
 const PURGE_PROCEDURE = /^(companies|contacts|deals)\.(purge|bulkPurge)$/;
+
+export function apiKeyRateLimited(): TRPCError {
+	return new TRPCError({
+		code: "TOO_MANY_REQUESTS",
+		message: "API key rate limit exceeded. Retry after a short wait.",
+	});
+}
 
 export type ApiKeyDecision = "allow" | "deny" | "sales";
 
