@@ -119,6 +119,7 @@ export type DataTableProps<TRow, TSub> = {
 	leadingActions?: ReactNode;
 	search?: ReactNode;
 	meta?: ReactNode;
+	body?: ReactNode;
 	empty?: ReactNode;
 	className?: string;
 	tableClassName?: string;
@@ -281,6 +282,7 @@ export function DataTable<TRow, TSub = unknown>({
 	leadingActions,
 	search,
 	meta,
+	body,
 	empty,
 	className,
 	tableClassName,
@@ -531,7 +533,7 @@ export function DataTable<TRow, TSub = unknown>({
 								</DropdownMenuContent>
 							</DropdownMenu>
 						)}
-						{hideable.length > 0 && (
+						{hideable.length > 0 && body == null && (
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
 									<Button
@@ -572,6 +574,8 @@ export function DataTable<TRow, TSub = unknown>({
 				</div>
 			</div>
 
+			{body ?? (
+				<>
 			<Table
 				className={cn(
 					"table-fixed [&_td:first-child]:pl-4 [&_th:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:last-child]:pr-4",
@@ -797,6 +801,8 @@ export function DataTable<TRow, TSub = unknown>({
 				loading={loading}
 				meta={meta}
 			/>
+				</>
+			)}
 		</div>
 	);
 }

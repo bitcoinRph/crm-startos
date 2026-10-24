@@ -6,6 +6,7 @@ export const SEARCH_PARAM = {
 		page: "page",
 		fields: "fields",
 		archived: "archived",
+		view: "view",
 	},
 	record: {
 		stack: "record",
