@@ -1,12 +1,22 @@
 import { db, Prisma } from "@crm/db";
 import { CRM_EVENT_CATALOG } from "@crm/db/crm-events";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
+import {
+	AGENT_APPROVAL_REJECTED_CODE,
+	AGENT_APPROVAL_STATES,
+} from "@crm/validation/agent-approval";
 import { crmEventTask } from "@crm/validation/agent-events";
 import { readAgentTriggerConfig } from "@crm/validation/agent-manifest";
 import type { SendFn } from "eve/channels";
 import { z } from "zod";
 import { DISPATCH } from "./dispatch-config";
 import { DEPENDENCY_UNAVAILABLE, runDependencyFailure } from "./run-preflight";
+import {
+	decidedSlackApprovals,
+	finishRun,
+	holdsPendingApproval,
+	postApprovedSlackAction,
+} from "./run-runtime";
 import {
 	isTerminalRunStatus,
 	lockAgentRun,
@@ -423,7 +433,54 @@ export async function pendingAgentRunIds(): Promise<string[]> {
 	return runnable;
 }
 
+export async function settleSlackApprovals(): Promise<number> {
+	const decided = await decidedSlackApprovals();
+	for (const { actionId, runId, state } of decided) {
+		if (state === AGENT_APPROVAL_STATES.REJECTED) {
+			await cancelRun(
+				runId,
+				AGENT_APPROVAL_REJECTED_CODE,
+				"A person rejected the Slack post. Nothing was sent.",
+			);
+		} else {
+			await postApproved(runId, actionId);
+		}
+	}
+	return decided.length;
+}
+
+async function postApproved(runId: string, actionId: string) {
+	let resumed = false;
+	let failure: string | null = null;
+	try {
+		resumed = await postApprovedSlackAction(actionId);
+	} catch (error) {
+		failure = error instanceof Error ? error.message : String(error);
+	}
+	if (!resumed && failure === null) return;
+
+	try {
+		await finishRun(runId, {
+			summary: "Posted the approved Slack message.",
+			result: {},
+		});
+	} catch (error) {
+		await failRun(
+			runId,
+			"NEVER_SETTLED",
+			failure ?? (error instanceof Error ? error.message : String(error)),
+		);
+	}
+}
+
 export async function drainAgentRuns(send: SendFn): Promise<number> {
+	await settleSlackApprovals().catch((error) => {
+		console.error(
+			`[agent] Slack approvals could not be settled: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+	});
 	await queueDueAgentRuns();
 
 	let dispatched = 0;
@@ -549,6 +606,12 @@ export async function failRun(runId: string, code: string, message: string) {
 			return { id: run.id, status: "FAILED" as const };
 		}
 		if (run.status === "SUCCEEDED" || run.status === "CANCELLED") {
+			return { id: run.id, status: run.status };
+		}
+		if (
+			run.status === "WAITING_FOR_APPROVAL" &&
+			(await holdsPendingApproval(tx, run.id))
+		) {
 			return { id: run.id, status: run.status };
 		}
 

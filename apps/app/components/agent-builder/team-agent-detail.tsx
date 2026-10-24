@@ -154,6 +154,19 @@ export function TeamAgentDetail({
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const decideApproval = useMutation(
+		trpc.agents.decideRunApproval.mutationOptions({
+			onSuccess: async (result) => {
+				await invalidate();
+				toast.success(
+					result.decision === "APPROVE"
+						? "Approved. The post goes out shortly."
+						: "Rejected. Nothing will be sent.",
+				);
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
 	const runAction = useAsyncAction({
 		action: () =>
 			runNow.mutateAsync({
@@ -318,7 +331,11 @@ export function TeamAgentDetail({
 				activity={activity.data ?? []}
 				agentId={agentId}
 				cancelling={cancelRun.isPending}
+				deciding={decideApproval.isPending}
 				onCancel={(runId) => cancelRun.mutate({ id: agentId, runId })}
+				onDecide={(runId, decision) =>
+					decideApproval.mutate({ id: agentId, runId, decision })
+				}
 				onOpenChange={setRunsOpen}
 				onRetry={(runId) =>
 					retryRun.mutate({

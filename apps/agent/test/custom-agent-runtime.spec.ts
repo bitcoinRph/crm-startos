@@ -689,6 +689,44 @@ describe("agent builder draft input", () => {
 		});
 	});
 
+	it("keeps a request for approval on the Slack post", () => {
+		const parsed = builderDraftToolInput.parse({
+			name: "Deal alert",
+			description: "Tell the team when a deal is created.",
+			instructions:
+				"When a deal is created, draft one Slack message for the sales channel and stop.",
+			triggers: [
+				{
+					type: "MANUAL",
+					name: "New deal alert",
+					summary: "Run for every new deal",
+				},
+			],
+			recordScope: "WORKSPACE",
+			resources: [],
+			integrations: ["slack"],
+			actions: [
+				{
+					type: "slack.message.post",
+					provider: "slack",
+					summary: "Post to #sales after approval",
+					requiresApproval: true,
+					destination: {
+						kind: "channel",
+						resolution: "chosen",
+						id: "C123",
+						label: "#sales",
+					},
+				},
+			],
+		});
+
+		expect(draftInputFromTool(parsed).actions[0]).toMatchObject({
+			type: "slack.message.post",
+			requiresApproval: true,
+		});
+	});
+
 	it("rejects Slack destinations outside the inspected choices", () => {
 		const connections = {
 			slackChannels: [{ id: "C123", label: "#sales", memberCount: 8 }],

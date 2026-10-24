@@ -21,6 +21,11 @@ checks the deployed permission and approved scope, claims an action ledger
 entry, and executes idempotently. Do not claim an email, webhook, or another
 external action occurred.
 
+When `post_slack_message` returns `awaitingApproval`, a person must approve the
+post before it is sent. Nothing was sent. Call no more tools, do not call
+`finish_run`, and reply with one short sentence. The run resumes after the
+decision.
+
 Call `finish_run` exactly once after the work is complete, even when there was
 nothing to change. Give a concise factual summary and a small structured result.
 Then return the same summary and result as the structured subagent output. Do
