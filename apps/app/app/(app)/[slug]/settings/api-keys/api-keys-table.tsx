@@ -24,6 +24,7 @@ import { LocalRelativeTime } from "@/components/local-date-time";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { ApiKeyCallsSheet } from "./api-key-calls-sheet";
 import { accessLabel } from "./api-key-profiles";
 import { apiKeysSearchParams } from "./api-keys-search-params";
 
@@ -43,7 +44,7 @@ function columns(
 			header: "Name",
 			sortable: true,
 			hideable: false,
-			width: "w-[22%]",
+			width: "w-[16%]",
 			cell: (row) => (
 				<span className="truncate font-medium">
 					{row.name ?? "Untitled key"}
@@ -119,6 +120,15 @@ function columns(
 				) : (
 					<span className="text-muted-foreground">Never</span>
 				),
+		},
+		{
+			id: "calls",
+			header: <span className="sr-only">Recent calls</span>,
+			label: "Recent calls",
+			hideable: false,
+			align: "right",
+			width: "w-[6%]",
+			cell: (row) => <ApiKeyCallsSheet id={row.id} name={row.name} />,
 		},
 		{
 			id: "actions",

@@ -14,6 +14,7 @@ import {
 	DEFAULT_WORKSPACE_NAME,
 	WORKSPACE_ID,
 } from "@crm/auth";
+import type { Db } from "@crm/db";
 import { db } from "@crm/db";
 import { workspaceSlug } from "@crm/db/workspace";
 import { readActionApproval } from "@crm/validation/agent-approval";
@@ -21,7 +22,11 @@ import type { MiddlewareOptions } from "nestjs-trpc";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentRunsService } from "../src/agent/agent-runs.service";
 import type { AgentTriggerService } from "../src/agent/agent-trigger.service";
+import { ApiKeyAuditService } from "../src/api-keys/api-key-audit.service";
 import { AuthMiddleware } from "../src/trpc/middlewares/auth.middleware";
+
+const audit = new ApiKeyAuditService({} as Db);
+spyOn(audit, "record").mockImplementation(() => undefined);
 
 const suffix = crypto.randomUUID();
 const ownerId = `agent-approval-owner-${suffix}`;
@@ -335,7 +340,7 @@ describe("approval is a human decision", () => {
 		for (const permissions of profiles) {
 			keyWith(permissions);
 			const { opts, next } = request({ [API_KEY_HEADER]: "crm_fixture" });
-			await expect(new AuthMiddleware().use(opts)).rejects.toMatchObject({
+			await expect(new AuthMiddleware(audit).use(opts)).rejects.toMatchObject({
 				code: "FORBIDDEN",
 			});
 			expect(next).not.toHaveBeenCalled();
@@ -346,7 +351,7 @@ describe("approval is a human decision", () => {
 	it("allows a human session", async () => {
 		const { opts, next } = request({ cookie: "human-cookie" });
 
-		await new AuthMiddleware().use(opts);
+		await new AuthMiddleware(audit).use(opts);
 
 		expect(next).toHaveBeenCalledTimes(1);
 	});

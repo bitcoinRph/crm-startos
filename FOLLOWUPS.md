@@ -35,15 +35,6 @@ Sales tools require every scope that their router enforces. Legacy keys see no s
 Cookie sessions see every allow-listed tool. Hidden calls still pass through server authorization.
 Verification: bridge tests cover all profiles, legacy keys, cookie sessions, and every hidden reader or legacy call.
 
-### Audit log per key
-
-- `Apikey.lastRequest` is the only trace today. Add an `ApiKeyCall` table:
-  `keyId`, `procedure`, `type`, `outcome` (`allowed`, `denied`), `createdAt`,
-  written by `AuthMiddleware` after the decision, batched or fire-and-forget.
-- Show the last 50 calls per key in Settings → API keys.
-- Retention: prune with the archive cron at `archiveRetentionDays`.
-- Never log arguments: they carry customer text.
-
 ## B. Codex in the CRM
 
 Implemented in this branch; `docs/codex.md` is the reference. What is left:

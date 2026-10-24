@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TRPCModule } from "nestjs-trpc";
+import { ApiKeyAuditModule } from "../api-keys/api-key-audit.module";
 import { ContextLogger } from "../logging/context-logger";
 import { formatTrpcError } from "./error-formatter";
 import { AuthMiddleware } from "./middlewares/auth.middleware";
@@ -11,6 +12,7 @@ import { TrpcErrorHandler } from "./trpc-error.handler";
 
 @Module({
 	imports: [
+		ApiKeyAuditModule,
 		TRPCModule.forRoot({
 			basePath: "/api/trpc",
 			context: TrpcContext,

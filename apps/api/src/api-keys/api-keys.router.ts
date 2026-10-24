@@ -13,7 +13,10 @@ import type { AuthedTrpcContext, BaseTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { SessionOnlyMiddleware } from "../trpc/middlewares/session-only.middleware";
 import { restMeta } from "../trpc/openapi";
+import { ApiKeyAuditService } from "./api-key-audit.service";
 import {
+	apiKeyCallsInput,
+	apiKeyCallsOutput,
 	apiKeyListInput,
 	apiKeyListOutput,
 	createApiKeyInput,
@@ -32,6 +35,7 @@ function headersOf(ctx: BaseTrpcContext): Headers {
 export class ApiKeysRouter {
 	constructor(
 		@Inject(ApiKeysService) private readonly apiKeys: ApiKeysService,
+		@Inject(ApiKeyAuditService) private readonly audit: ApiKeyAuditService,
 	) {}
 
 	@Query({
@@ -44,6 +48,22 @@ export class ApiKeysRouter {
 		@Input() input: z.infer<typeof apiKeyListInput>,
 	) {
 		return this.apiKeys.list(ctx.user.id, input);
+	}
+
+	@Query({
+		input: apiKeyCallsInput,
+		output: apiKeyCallsOutput,
+		meta: restMeta("GET", "/api-keys/{id}/calls", ["API Keys"]),
+	})
+	async calls(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof apiKeyCallsInput>,
+	) {
+		const rows = await this.audit.recent(ctx.user.id, input.id);
+		return rows.map((row) => ({
+			...row,
+			createdAt: row.createdAt.toISOString(),
+		}));
 	}
 
 	@Mutation({

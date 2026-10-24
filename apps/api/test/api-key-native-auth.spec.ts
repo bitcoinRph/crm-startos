@@ -14,6 +14,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import type { Request as ExpressRequest } from "express";
 import type { MiddlewareOptions } from "nestjs-trpc";
 import { z } from "zod";
+import { ApiKeyAuditService } from "../src/api-keys/api-key-audit.service";
 import {
 	API_KEY_PROFILES,
 	KEY_PERMISSIONS,
@@ -22,6 +23,10 @@ import { ApiKeysService } from "../src/api-keys/api-keys.service";
 import { keyFromHeaders } from "../src/trpc/api-key-access";
 import { AuthMiddleware } from "../src/trpc/middlewares/auth.middleware";
 import { createBaseTrpcContext } from "../src/trpc/trpc.context";
+
+const audit = new ApiKeyAuditService({} as Db);
+spyOn(audit, "record").mockImplementation(() => undefined);
+const middleware = new AuthMiddleware(audit);
 
 function testAuth() {
 	return betterAuth({
@@ -252,17 +257,17 @@ describe("tRPC and MCP shared authentication with the pinned plugin", () => {
 					type: "query",
 					next,
 				} as unknown as MiddlewareOptions;
-				await new AuthMiddleware().use(opts);
+				await middleware.use(opts);
 				expect(next).toHaveBeenCalledTimes(1);
 				await expect(
-					new AuthMiddleware().use({
+					middleware.use({
 						...opts,
 						path: "contacts.update",
 						type: "mutation",
 					}),
 				).rejects.toMatchObject({ code: "FORBIDDEN" });
 				await expect(
-					new AuthMiddleware().use({
+					middleware.use({
 						...opts,
 						path: "apiKeys.create",
 						type: "mutation",
@@ -402,7 +407,7 @@ describe("API key rate limit", () => {
 			} as ExpressRequest);
 			expect(last.session?.user.id).toBe(userId);
 			await expect(
-				new AuthMiddleware().use({
+				middleware.use({
 					ctx: last,
 					path: "contacts.list",
 					type: "query",

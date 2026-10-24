@@ -20,6 +20,7 @@ import {
 	ApiTags,
 } from "@nestjs/swagger";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
+import { ApiKeyAuditService } from "../api-keys/api-key-audit.service";
 import { CompaniesService } from "../companies/companies.service";
 import type { EnvironmentVariables } from "../config/env.validation";
 import { ContactsService } from "../contacts/contacts.service";
@@ -46,6 +47,7 @@ export class ArchiveRetentionController {
 		private readonly companies: CompaniesService,
 		private readonly contacts: ContactsService,
 		private readonly deals: DealsService,
+		private readonly apiKeyAudit: ApiKeyAuditService,
 		config: ConfigService<EnvironmentVariables, true>,
 	) {
 		this.secret = config.get("CRON_SECRET", { infer: true });
@@ -83,10 +85,11 @@ export class ArchiveRetentionController {
 		const retentionDays = await readArchiveRetentionDays(this.db);
 		const before = new Date(Date.now() - retentionDays * DAY_MS);
 
-		const [companies, contacts, deals] = await Promise.all([
+		const [companies, contacts, deals, apiKeyCalls] = await Promise.all([
 			this.companies.purgeExpired(before),
 			this.contacts.purgeExpired(before),
 			this.deals.purgeExpired(before),
+			this.apiKeyAudit.purgeExpired(before),
 		]);
 
 		this.logger.log({
@@ -98,9 +101,10 @@ export class ArchiveRetentionController {
 			contactsSkipped: contacts.skipped,
 			deals: deals.succeeded,
 			dealsSkipped: deals.skipped,
+			apiKeyCalls,
 		});
 
-		return { retentionDays, companies, contacts, deals };
+		return { retentionDays, companies, contacts, deals, apiKeyCalls };
 	}
 }
 

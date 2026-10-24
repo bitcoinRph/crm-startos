@@ -9,11 +9,13 @@ import {
 import { SessionOnlyMiddleware } from "../src/trpc/middlewares/session-only.middleware";
 
 const scoped = (permissions: Record<string, string[]>): VerifiedApiKey => ({
+	id: "key-1",
 	referenceId: "member-1",
 	permissions,
 });
 
 const legacy: VerifiedApiKey = {
+	id: "key-1",
 	referenceId: "member-1",
 	permissions: null,
 };

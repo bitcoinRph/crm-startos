@@ -3,6 +3,7 @@ import { z } from "zod";
 import { type ApiKeyPermissions, permits } from "../api-keys/api-key-profiles";
 
 export type VerifiedApiKey = {
+	id: string;
 	referenceId: string;
 	permissions: ApiKeyPermissions | null;
 };

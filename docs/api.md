@@ -265,6 +265,15 @@ from the stored permissions, never from the request.
 - **The profile name says what the key can do, not which agent holds it.** The
   free-text `name` is where "hermes" or "openclaw" goes.
 - **Each key is rate-limited.** `API_KEY_RATE_LIMIT` in `packages/auth/src/api-key-config.ts` allows 3,000 key checks per 60 s per key, and one tRPC or MCP call makes two checks. The count resets only after the key is idle for longer than the window, so a continuously busy agent can be paused for up to 60 s. A key over the limit gets `429` or `TOO_MANY_REQUESTS`, and other keys are not affected. Better Auth stores the numbers on each key row at creation, so changing them needs a migration that updates the `apikey` rows.
+- **Every call a key makes leaves one `ApiKeyCall` row**: key id, procedure,
+  `query` or `mutation`, and `allowed` or `denied`. `AuthMiddleware` writes it
+  after the decision through `ApiKeyAuditService.record`, fire-and-forget: a
+  failed write logs a warning and never fails the request. MCP tools reach the
+  same middleware, so they are covered. A `sales.*` call records after the
+  procedure runs: `denied` when it fails with `FORBIDDEN`, else `allowed`. **Never
+  store arguments, headers or bodies** — they carry customer text. Settings → API
+  keys shows the last 50 per key (`apiKeys.calls`, session-only). The archive
+  prune deletes rows older than `archiveRetentionDays`, in batches.
 - **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
   endpoint. `keyFromHeaders` normalises it before the session is resolved.
 
