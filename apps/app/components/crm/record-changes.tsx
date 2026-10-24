@@ -1,8 +1,18 @@
 "use client";
 
 import { Button } from "@crm/ui/components/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@crm/ui/components/dialog";
 import { Spinner } from "@crm/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 import { RECORD_CHANGES } from "@/components/crm/record-changes-config";
 import { LocalDateTime, LocalRelativeTime } from "@/components/local-date-time";
@@ -68,18 +78,26 @@ function changedLines(change: RecordChange) {
 	}));
 }
 
-function undoLabel(change: RecordChange): string {
+function changeSubject(change: RecordChange): string {
 	if (change.operation === "CREATE") {
-		return `Undo creation of ${ENTITY_WORDS[change.entity]}`;
+		return `creation of ${ENTITY_WORDS[change.entity]}`;
 	}
 	const labels = [...new Set(changedLines(change).map((line) => line.label))];
 	return labels.length > 0
-		? `Undo change to ${labels.join(", ")}`
-		: `Undo change to ${ENTITY_WORDS[change.entity]}`;
+		? `change to ${labels.join(", ")}`
+		: `change to ${ENTITY_WORDS[change.entity]}`;
+}
+
+function undoLabel(change: RecordChange): string {
+	if (change.operation === "CREATE") {
+		return `Undo creation: archive this ${ENTITY_WORDS[change.entity]}`;
+	}
+	return `Undo ${changeSubject(change)}`;
 }
 
 function ChangeLines({ change }: { change: RecordChange }) {
 	if (change.operation === "CREATE") return <p>Created</p>;
+	if (change.valuesHidden) return <p>Values hidden</p>;
 	const lines = changedLines(change);
 	if (lines.length === 0) return <p>Updated</p>;
 	return (
@@ -91,6 +109,60 @@ function ChangeLines({ change }: { change: RecordChange }) {
 				</li>
 			))}
 		</ul>
+	);
+}
+
+function ForgetChangeDialog({ change }: { change: RecordChange }) {
+	const trpc = useTRPC();
+	const queryClient = useQueryClient();
+	const [open, setOpen] = useState(false);
+
+	const forget = useMutation(
+		trpc.recordChanges.forget.mutationOptions({
+			onSuccess: async () => {
+				await queryClient.invalidateQueries({
+					queryKey: trpc.recordChanges.list.pathKey(),
+				});
+				setOpen(false);
+				toast.success("Change forgotten.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger asChild>
+				<Button
+					variant="outline"
+					size="sm"
+					aria-label={`Forget ${changeSubject(change)}`}
+				>
+					Forget
+				</Button>
+			</DialogTrigger>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Forget this change</DialogTitle>
+					<DialogDescription>
+						The change and its values leave the history for good. You cannot
+						undo this.
+					</DialogDescription>
+				</DialogHeader>
+				<DialogFooter>
+					<Button variant="outline" onClick={() => setOpen(false)}>
+						Cancel
+					</Button>
+					<Button
+						variant="destructive"
+						disabled={forget.isPending}
+						onClick={() => forget.mutate({ id: change.id })}
+					>
+						Forget change
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -172,17 +244,20 @@ export function RecordChanges({ filter }: { filter: RecordChangesFilter }) {
 						</div>
 						<ChangeLines change={change} />
 					</div>
-					{change.revertible ? (
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={revert.isPending}
-							aria-label={undoLabel(change)}
-							onClick={() => revert.mutate({ id: change.id })}
-						>
-							Undo
-						</Button>
-					) : null}
+					<div className="flex shrink-0 items-center gap-2">
+						{change.revertible ? (
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={revert.isPending}
+								aria-label={undoLabel(change)}
+								onClick={() => revert.mutate({ id: change.id })}
+							>
+								Undo
+							</Button>
+						) : null}
+						<ForgetChangeDialog change={change} />
+					</div>
 				</li>
 			))}
 		</ul>

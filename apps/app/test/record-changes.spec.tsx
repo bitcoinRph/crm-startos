@@ -17,11 +17,22 @@ const base: Change = {
 	operation: "UPDATE",
 	before: { title: "Buyer" },
 	after: { title: "Head of Buying" },
+	valuesHidden: false,
 	actorKind: "USER",
 	actorId: null,
 	actorUserId: "user-1",
 	revertible: true,
 	createdAt: "2026-09-22T00:00:00.000Z",
+};
+
+const hiddenValues: Change = {
+	...base,
+	id: "00000000-0000-4000-8000-000000000005",
+	actorKind: "API_KEY",
+	before: null,
+	after: null,
+	valuesHidden: true,
+	revertible: true,
 };
 
 const changes: Change[] = [
@@ -51,8 +62,9 @@ const changes: Change[] = [
 		operation: "CREATE",
 		before: null,
 		after: null,
-		revertible: false,
+		revertible: true,
 	},
+	hiddenValues,
 ];
 
 function Seed({
@@ -111,8 +123,26 @@ describe("record changes list", () => {
 	});
 
 	it("offers Undo only on revertible rows", () => {
-		expect(html.match(/>Undo</g)).toHaveLength(1);
+		expect(html.match(/>Undo</g)).toHaveLength(3);
 		expect(html).toContain('aria-label="Undo change to Title"');
+	});
+
+	it("says that undoing a creation archives the record", () => {
+		expect(html).toContain('aria-label="Undo creation: archive this contact"');
+	});
+
+	it("offers Forget on every row", () => {
+		expect(html.match(/>Forget</g)).toHaveLength(changes.length);
+		expect(html).toContain('aria-label="Forget change to Title"');
+		expect(html).toContain('aria-label="Forget creation of contact"');
+	});
+
+	it("hides values when the server withholds them", () => {
+		const hidden = render({ entity: "CONTACT", recordId: "contact-1" }, [
+			hiddenValues,
+		]);
+		expect(hidden).toContain("Values hidden");
+		expect(hidden).not.toContain("→");
 	});
 
 	it("shows the record kind in the API key view", () => {
