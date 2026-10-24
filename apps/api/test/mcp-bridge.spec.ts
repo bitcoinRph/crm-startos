@@ -2414,6 +2414,21 @@ describe("record change ledger", () => {
 		expect(after.baseAmount).toBeNull();
 	});
 
+	it("keeps the actor after the database client reconnects", async () => {
+		await db.$disconnect();
+		await runAsChangeActor({ kind: "AGENT" }, () =>
+			db.contact.update({
+				where: { id: contactId },
+				data: { title: "After reconnect" },
+			}),
+		);
+		const [latest] = await contactHistory();
+		expect(latest).toMatchObject({
+			after: { title: "After reconnect" },
+			actorKind: "AGENT",
+		});
+	});
+
 	it("prunes changes older than the retention window", async () => {
 		await db.contact.update({
 			where: { id: contactId },

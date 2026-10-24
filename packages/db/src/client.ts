@@ -104,7 +104,7 @@ const SET_CHANGE_ACTOR = "SELECT set_config('crm.actor', $1, false)";
 const WRITE_STATEMENT = /^\s*(insert|update|delete|with)\b/i;
 
 function changeActorPool(url: string): Pool {
-	const pool = new Pool({ connectionString: url });
+	const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
 
 	const connectAsActor = async (): Promise<PoolClient> => {
 		const client = await pool.connect();
@@ -138,9 +138,7 @@ function changeActorPool(url: string): Pool {
 
 const createPrismaClient = () => {
 	const client = new PrismaClient({
-		adapter: new PrismaPg(changeActorPool(connectionString), {
-			disposeExternalPool: true,
-		}),
+		adapter: new PrismaPg(changeActorPool(connectionString)),
 		log: logDefinitions,
 	});
 
