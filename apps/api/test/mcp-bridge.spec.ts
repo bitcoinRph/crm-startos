@@ -11,7 +11,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { setImmediate } from "node:timers/promises";
-import { auth } from "@crm/auth";
+import { API_KEY_RATE_LIMIT, auth } from "@crm/auth";
 import { db } from "@crm/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -184,6 +184,39 @@ afterAll(async () => {
 });
 
 describe("MCP contract", () => {
+	it("refuses a rate-limited key with HTTP 429 and keeps other keys working", async () => {
+		const limited = await createKey("agent_read");
+		for (let used = 0; used < API_KEY_RATE_LIMIT.maxRequests; used++) {
+			const verified = await fixture.api.verifyApiKey({
+				body: { key: limited.key },
+			});
+			expect(verified.valid).toBe(true);
+		}
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-api-key": limited.key,
+			},
+			body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+		});
+		expect(response.status).toBe(429);
+		expect(
+			z.object({ error: z.string() }).parse(await response.json()).error,
+		).toContain("rate limit");
+		const trpc = await fetch(new URL("/api/trpc/contacts.list", endpoint), {
+			headers: { "x-api-key": limited.key },
+		});
+		expect(trpc.status).toBe(429);
+		const rest = await fetch(
+			new URL("/rest/search/resolve-customer?email=a@b.test", endpoint),
+			{ headers: { authorization: `Bearer ${limited.key}` } },
+		);
+		expect(rest.status).toBe(429);
+		const tools = await reader.listTools();
+		expect(tools.tools.length).toBeGreaterThan(0);
+	});
+
 	it("drains rejected POST bytes without parsing JSON-RPC", async () => {
 		let drained: boolean | undefined;
 		const observe = (request: IncomingMessage, response: ServerResponse) => {

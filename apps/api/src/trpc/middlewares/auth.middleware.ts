@@ -8,6 +8,7 @@ import type {
 } from "nestjs-trpc";
 import { setRequestUserId } from "../../logging/request-context";
 import {
+	apiKeyRateLimited,
 	authorizeApiKeyProcedure,
 	keyFromHeaders,
 	type VerifiedApiKey,
@@ -21,6 +22,7 @@ export async function verifiedApiKey(
 	const key = ctx.req ? keyFromHeaders(ctx.req.headers) : null;
 	if (!key) return null;
 	const verified = await auth.api.verifyApiKey({ body: { key } });
+	if (verified.error?.code === "RATE_LIMITED") throw apiKeyRateLimited();
 	if (!verified.valid || !verified.key || verified.key.referenceId !== userId) {
 		throw new TRPCError({ code: "FORBIDDEN", message: "API key denied." });
 	}
