@@ -1,6 +1,8 @@
 import "@crm/env/load";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool, type PoolClient, type QueryConfig } from "pg";
+import { changeActorTag } from "./change-actor";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
 
 const connectionString =
@@ -98,9 +100,47 @@ const logDefinitions: Prisma.LogDefinition[] = [
 		: []),
 ];
 
+const SET_CHANGE_ACTOR = "SELECT set_config('crm.actor', $1, false)";
+const WRITE_STATEMENT = /^\s*(insert|update|delete|with)\b/i;
+
+function changeActorPool(url: string): Pool {
+	const pool = new Pool({ connectionString: url });
+
+	const connectAsActor = async (): Promise<PoolClient> => {
+		const client = await pool.connect();
+		try {
+			await client.query(SET_CHANGE_ACTOR, [changeActorTag()]);
+		} catch (error) {
+			client.release(true);
+			throw error;
+		}
+		return client;
+	};
+
+	const queryAsActor = async (config: QueryConfig) => {
+		if (!WRITE_STATEMENT.test(config.text)) return pool.query(config);
+		const client = await connectAsActor();
+		try {
+			return await client.query(config);
+		} finally {
+			client.release();
+		}
+	};
+
+	return new Proxy(pool, {
+		get(target, property, receiver) {
+			if (property === "connect") return connectAsActor;
+			if (property === "query") return queryAsActor;
+			return Reflect.get(target, property, receiver);
+		},
+	});
+}
+
 const createPrismaClient = () => {
 	const client = new PrismaClient({
-		adapter: new PrismaPg({ connectionString }),
+		adapter: new PrismaPg(changeActorPool(connectionString), {
+			disposeExternalPool: true,
+		}),
 		log: logDefinitions,
 	});
 

@@ -8,6 +8,7 @@
 		"./agent-tasks": "./src/agent-tasks.ts",
 		"./attribution": "./src/attribution.ts",
 		"./blob": "./src/blob.ts",
+		"./change-actor": "./src/change-actor.ts",
 		"./client": "./src/client.ts",
 		"./currency": "./src/currency.ts",
 		"./crm-events": "./src/crm-events.ts",
@@ -56,6 +57,7 @@
 	"devDependencies": {
 		"@crm/typescript-config": "workspace:*",
 		"@types/node": "^24.10.1",
+		"@types/pg": "^8.20.0",
 		"typescript": "5.9.2"
 	}
 }
