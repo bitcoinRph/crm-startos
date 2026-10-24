@@ -2429,6 +2429,71 @@ describe("record change ledger", () => {
 		});
 	});
 
+	it("attributes a comment-prefixed raw write and keeps the order inside one transaction", async () => {
+		await runAsChangeActor(
+			{ kind: "AGENT" },
+			() =>
+				db.$executeRaw`/* note */ UPDATE "contact" SET "phone" = '+1 555 0101' WHERE id = ${contactId}`,
+		);
+		await runAsChangeActor({ kind: "AGENT" }, () =>
+			db.$transaction(async (tx) => {
+				await tx.contact.update({
+					where: { id: contactId },
+					data: { title: "First" },
+				});
+				await tx.contact.update({
+					where: { id: contactId },
+					data: { title: "Second" },
+				});
+			}),
+		);
+		const [second, first, raw] = await contactHistory();
+		expect(raw).toMatchObject({
+			after: { phone: "+1 555 0101" },
+			actorKind: "AGENT",
+		});
+		expect(first?.after).toEqual({ title: "First" });
+		expect(second?.after).toEqual({ title: "Second" });
+	});
+
+	it("writes no history for a deleted field definition and refuses an undo to a purged company", async () => {
+		const field = await db.fieldDefinition.create({
+			data: {
+				entity: "CONTACT",
+				key: `${prefix.replaceAll("-", "_")}_gone`,
+				label: "Gone",
+				type: "TEXT",
+				position: 998,
+			},
+		});
+		await db.fieldValue.create({
+			data: { fieldId: field.id, contactId, text: "Value" },
+		});
+		const before = await db.recordChange.count({
+			where: { recordId: contactId },
+		});
+		await db.fieldDefinition.delete({ where: { id: field.id } });
+		expect(
+			await db.recordChange.count({ where: { recordId: contactId } }),
+		).toBe(before);
+
+		const other = await db.company.create({
+			data: { id: `${prefix}-other`, name: `${prefix} other` },
+		});
+		await db.contact.update({
+			where: { id: contactId },
+			data: { companyId: other.id },
+		});
+		const [moved] = await contactHistory();
+		await db.company.delete({ where: { id: other.id } });
+		const [detached] = await contactHistory();
+		expect(detached?.after).toEqual({ companyId: null });
+		const response = await revertAsPerson(z.string().parse(detached?.id));
+		expect(response.status).toBe(409);
+		expect(await response.text()).toContain("no longer exists");
+		expect(moved?.after).toEqual({ companyId: other.id });
+	});
+
 	it("prunes changes older than the retention window", async () => {
 		await db.contact.update({
 			where: { id: contactId },

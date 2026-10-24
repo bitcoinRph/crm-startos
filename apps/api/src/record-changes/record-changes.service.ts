@@ -209,6 +209,7 @@ export class RecordChangesService {
 				code: "CONFLICT",
 				message: `${moved.join(", ")} changed again after this change. Nothing was undone.`,
 			});
+		await this.assertReferencesExist(revert);
 
 		if (revert.entity === "CONTACT") {
 			const { archivedAt, ...update } = revert.plan;
@@ -270,6 +271,35 @@ export class RecordChangesService {
 			if (expired.length < ARCHIVE.prune.maxBatch) break;
 		}
 		return removed;
+	}
+
+	private async assertReferencesExist(revert: RevertPlan) {
+		const companyId =
+			"companyId" in revert.plan ? revert.plan.companyId : undefined;
+		const ownerId = revert.plan.ownerId;
+		const [company, owner] = await Promise.all([
+			companyId
+				? this.db.company.findUnique({
+						where: { id: companyId },
+						select: { id: true },
+					})
+				: null,
+			ownerId
+				? this.db.user.findUnique({
+						where: { id: ownerId },
+						select: { id: true },
+					})
+				: null,
+		]);
+		const gone = [
+			companyId && !company ? "the company" : null,
+			ownerId && !owner ? "the owner" : null,
+		].filter((name) => name !== null);
+		if (gone.length)
+			throw new TRPCError({
+				code: "CONFLICT",
+				message: `${gone.join(" and ")} it pointed to no longer exists. Nothing was undone.`,
+			});
 	}
 
 	private async currentRow(entity: FieldEntity, recordId: string) {

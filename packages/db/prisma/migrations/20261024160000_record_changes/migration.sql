@@ -56,6 +56,7 @@ BEGIN
     END;
     field_id := source->>'fieldId';
     IF TG_OP = 'DELETE' AND (
+      NOT EXISTS (SELECT 1 FROM "fieldDefinition" WHERE id = field_id) OR
       (record_entity = 'CONTACT' AND NOT EXISTS (SELECT 1 FROM "contact" WHERE id = record_id)) OR
       (record_entity = 'COMPANY' AND NOT EXISTS (SELECT 1 FROM "company" WHERE id = record_id)) OR
       (record_entity = 'DEAL' AND NOT EXISTS (SELECT 1 FROM "deal" WHERE id = record_id))
@@ -102,8 +103,8 @@ BEGIN
     actor_kind := 'AGENT';
   END IF;
 
-  INSERT INTO "recordChange" (entity, "recordId", "fieldId", operation, before, after, "actorKind", "actorId", "actorUserId")
-  VALUES (record_entity, record_id, field_id, change_operation, change_before, change_after, actor_kind, actor_id, actor_user_id);
+  INSERT INTO "recordChange" (entity, "recordId", "fieldId", operation, before, after, "actorKind", "actorId", "actorUserId", "createdAt")
+  VALUES (record_entity, record_id, field_id, change_operation, change_before, change_after, actor_kind, actor_id, actor_user_id, clock_timestamp() AT TIME ZONE 'UTC');
   RETURN NULL;
 END;
 $$;

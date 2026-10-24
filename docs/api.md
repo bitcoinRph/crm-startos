@@ -461,8 +461,11 @@ import, mail sync, the agent and raw SQL included.
 
 - **The actor is a connection setting, not an argument.** `runAsChangeActor`
   (`@crm/db/change-actor`) holds the actor in `AsyncLocalStorage`. The pool in
-  `packages/db/src/client.ts` sets `crm.actor` on the connection before each write
-  statement and at the start of each transaction. `AuthMiddleware` runs every tRPC,
+  `packages/db/src/client.ts` sets `crm.actor` with `set_config(..., true)` inside
+  the write's own transaction: an autocommit write runs as `BEGIN`, the setting,
+  the write, `COMMIT`, and a transaction sets it before each write statement. The
+  setting never outlives the transaction, so a pooled connection carries no stale
+  actor and a transaction-mode pooler keeps both on one backend. `AuthMiddleware` runs every tRPC,
   MCP and REST call as `USER` or `API_KEY`; `apps/agent/agent/agent.ts` makes the
   agent's default `AGENT`; anything else is `SYSTEM`. `runAsChangeActor` awaits
   inside the context, because a Prisma promise runs only when it is awaited.
@@ -472,15 +475,17 @@ import, mail sync, the agent and raw SQL included.
   columns). A create stores the operation, not the values. A custom-field insert or
   delete is an update of that field's value, with `fieldId` set.
 - **A purge forgets the record.** Deleting a company, contact or deal deletes its
-  ledger rows in the same statement, and a cascaded field-value delete writes none.
+  ledger rows in the same statement. A field-value delete cascaded from a purged
+  record or a deleted field definition writes none.
   The archive prune deletes rows older than `archiveRetentionDays`.
 - **`recordChanges.list` reads it** (`crm:read`; MCP tool `record_history`): by
   record (`entity` + `recordId`) or by key (`apiKeyId`), newest first.
 - **`recordChanges.revert` is for a person only.** Every key is denied
   (`HUMAN_ONLY_PROCEDURE`). It refuses with `CONFLICT` when a changed column has
   moved since, and it undoes through the services (`update`, `archive`/`restore`,
-  `setStage`), so normalisation, exchange rates and events run as for any edit. The
-  undo is itself a ledger row. Custom-field values and creates cannot be undone here;
+  `setStage`), so normalisation, exchange rates and events run as for any edit. It
+  refuses with `CONFLICT` when the company or owner it would point back to is gone.
+  The undo is itself a ledger row. Custom-field values and creates cannot be undone here;
   `revertible` in the list says which rows can.
 
 ## Money
