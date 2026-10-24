@@ -25,6 +25,7 @@ import { z } from "zod";
 import { activityEntryOutput } from "../src/activities/activities.contracts";
 import { ActivitiesService } from "../src/activities/activities.service";
 import * as localDay from "../src/activities/local-day";
+import { ApiKeyAuditService } from "../src/api-keys/api-key-audit.service";
 import {
 	type ApiKeyProfile,
 	KEY_PERMISSIONS,
@@ -74,6 +75,7 @@ let readerKey: Awaited<
 >;
 let sessionSpy: ReturnType<typeof spyOn<typeof auth.api, "getSession">>;
 let verifySpy: ReturnType<typeof spyOn<typeof auth.api, "verifyApiKey">>;
+let auditSpy: ReturnType<typeof spyOn<ApiKeyAuditService, "record">>;
 const clients: Client[] = [];
 const extraUserIds: string[] = [];
 
@@ -144,6 +146,9 @@ beforeEach(async () => {
 	verifySpy = spyOn(auth.api, "verifyApiKey").mockImplementation(
 		fixture.api.verifyApiKey,
 	);
+	auditSpy = spyOn(ApiKeyAuditService.prototype, "record").mockImplementation(
+		() => undefined,
+	);
 	await db.user.create({
 		data: { id: userId, name: "MCP fixture", email: `${prefix}@example.com` },
 	});
@@ -169,6 +174,7 @@ afterEach(async () => {
 	for (const client of clients.splice(0)) await client.close();
 	sessionSpy?.mockRestore();
 	verifySpy?.mockRestore();
+	auditSpy?.mockRestore();
 	await db.activity.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.deal.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.contact.deleteMany({ where: { id: { startsWith: prefix } } });
@@ -480,6 +486,28 @@ describe("MCP contract", () => {
 		expect(
 			await db.contact.findUniqueOrThrow({ where: { id: contactId } }),
 		).toEqual(before);
+	});
+
+	it("records an MCP call and a refused MCP call against the key", async () => {
+		await call(reader, { name: "get_company", arguments: { id: companyId } });
+		await call(reader, {
+			name: "update_contact",
+			arguments: { id: contactId, data: { firstName: "Forbidden change" } },
+		});
+		expect(auditSpy.mock.calls.map(([entry]) => entry)).toEqual([
+			{
+				keyId: readerKey.id,
+				procedure: "companies.byId",
+				type: "query",
+				outcome: "allowed",
+			},
+			{
+				keyId: readerKey.id,
+				procedure: "contacts.update",
+				type: "mutation",
+				outcome: "denied",
+			},
+		]);
 	});
 
 	it("M4 never exposes key management or Codex procedures", () => {
