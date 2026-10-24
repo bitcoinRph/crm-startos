@@ -8,5 +8,4 @@ export const SALES_WORKFLOW = {
 	pollTimeoutMs: POLL_TIMEOUT_MINUTES * MINUTE_MS,
 	queue: { refreshMs: 30 * SECOND_MS, limit: 25 },
 	sourceMaxLength: 2048,
-	rejectionReasonMaxLength: 500,
 } as const;

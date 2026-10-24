@@ -2,17 +2,20 @@
 
 import {
 	Card,
+	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@crm/ui/components/card";
 import {
 	SimpleTable,
+	SimpleTableCell,
 	type SimpleTableColumn,
+	SimpleTableEmpty,
 	SimpleTableRow,
+	SimpleTableRowButton,
 } from "@crm/ui/components/simple-table";
 import { StatusIndicator } from "@crm/ui/components/status-indicator";
-import { TableCell } from "@crm/ui/components/table";
 import { useQuery } from "@tanstack/react-query";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { useTRPC } from "@/lib/trpc/client";
@@ -31,9 +34,11 @@ function plural(count: number, word: string) {
 
 export function SalesReviewQueue({
 	activeId,
+	disabled = false,
 	onOpen,
 }: {
 	activeId: string;
+	disabled?: boolean;
 	onOpen: (requestId: string) => void;
 }) {
 	const trpc = useTRPC();
@@ -55,79 +60,78 @@ export function SalesReviewQueue({
 					wait for an agent.
 				</CardDescription>
 			</CardHeader>
-			<p
-				aria-live="polite"
-				className="text-muted-foreground text-xs"
-				data-proposed={counts?.proposed}
-				data-pending={counts?.pending}
-			>
-				{counts
-					? `${plural(counts.proposed, "proposal")} to review · ${plural(counts.pending, "request")} waiting for an agent.`
-					: queue.isError
-						? `Could not load the queue. ${queue.error.message}`
-						: "Loading the queue…"}
-			</p>
-			<SimpleTable columns={COLUMNS} className="table-fixed">
-				{rows.length ? (
-					rows.map((row) => {
-						const name = [
-							row.contactSnapshot.firstName,
-							row.contactSnapshot.lastName,
-						]
-							.filter(Boolean)
-							.join(" ");
-						return (
-							<SimpleTableRow
-								key={row.id}
-								clickable
-								data-request={row.id}
-								data-status={row.status}
-								aria-current={row.id === activeId ? "true" : undefined}
-								onClick={() => onOpen(row.id)}
-							>
-								<TableCell className="overflow-hidden px-3 py-2">
-									<button
-										type="button"
-										className="block max-w-full truncate text-left font-medium underline-offset-4 hover:underline"
-										onClick={(event) => {
-											event.stopPropagation();
-											onOpen(row.id);
-										}}
+			<CardContent>
+				<div className="flex flex-col gap-3">
+					<p
+						aria-live="polite"
+						className="text-muted-foreground text-xs"
+						data-proposed={counts?.proposed}
+						data-pending={counts?.pending}
+					>
+						{counts
+							? `${plural(counts.proposed, "proposal")} to review · ${plural(counts.pending, "request")} waiting for an agent.`
+							: queue.isError
+								? `Could not load the queue. ${queue.error.message}`
+								: "Loading the queue…"}
+					</p>
+					<SimpleTable columns={COLUMNS} layout="fixed">
+						{rows.length ? (
+							rows.map((row) => {
+								const name = [
+									row.contactSnapshot.firstName,
+									row.contactSnapshot.lastName,
+								]
+									.filter(Boolean)
+									.join(" ");
+								return (
+									<SimpleTableRow
+										key={row.id}
+										clickable={!disabled}
+										data-request={row.id}
+										data-status={row.status}
+										aria-current={row.id === activeId ? "true" : undefined}
+										aria-disabled={disabled || undefined}
+										onClick={disabled ? undefined : () => onOpen(row.id)}
 									>
-										{name || row.contactSnapshot.email || row.contactId}
-									</button>
-								</TableCell>
-								<TableCell className="px-3 py-2">
-									<StatusIndicator
-										size="sm"
-										tone={row.status === "PROPOSED" ? "primary" : "neutral"}
-										label={
-											row.status === "PROPOSED"
-												? "Ready for your review"
-												: "Waiting for the agent"
-										}
-									/>
-								</TableCell>
-								<TableCell className="px-3 py-2 text-right tabular-nums">
-									{row.proposal?.operations.length ?? "—"}
-								</TableCell>
-								<TableCell className="px-3 py-2 text-right text-muted-foreground">
-									<LocalRelativeTime date={row.createdAt} />
-								</TableCell>
-							</SimpleTableRow>
-						);
-					})
-				) : (
-					<SimpleTableRow>
-						<TableCell
-							colSpan={COLUMNS.length}
-							className="h-20 text-center text-muted-foreground"
-						>
-							{queue.isPending ? "Loading…" : "Nothing waits for review."}
-						</TableCell>
-					</SimpleTableRow>
-				)}
-			</SimpleTable>
+										<SimpleTableCell truncate>
+											<SimpleTableRowButton
+												disabled={disabled}
+												onClick={(event) => {
+													event.stopPropagation();
+													onOpen(row.id);
+												}}
+											>
+												{name || row.contactSnapshot.email || row.contactId}
+											</SimpleTableRowButton>
+										</SimpleTableCell>
+										<SimpleTableCell>
+											<StatusIndicator
+												size="sm"
+												tone={row.status === "PROPOSED" ? "primary" : "neutral"}
+												label={
+													row.status === "PROPOSED"
+														? "Ready for your review"
+														: "Waiting for the agent"
+												}
+											/>
+										</SimpleTableCell>
+										<SimpleTableCell align="right" numeric>
+											{row.proposal?.operations.length ?? "—"}
+										</SimpleTableCell>
+										<SimpleTableCell align="right" muted>
+											<LocalRelativeTime date={row.createdAt} />
+										</SimpleTableCell>
+									</SimpleTableRow>
+								);
+							})
+						) : (
+							<SimpleTableEmpty columns={COLUMNS.length}>
+								{queue.isPending ? "Loading…" : "Nothing waits for review."}
+							</SimpleTableEmpty>
+						)}
+					</SimpleTable>
+				</div>
+			</CardContent>
 		</Card>
 	);
 }
