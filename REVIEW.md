@@ -516,7 +516,7 @@ D7 exact verified version list. D4 (architecture) is still open; CI builds both.
 | Finding | Where | Status |
 | --- | --- | --- |
 | B1 Ollama unreachable | PR #8 `feat(startos)` commit | Done: optional `ollama` dependency, bridge address, model-ID-only action |
-| B2 no production extractor | PR #8 `feat(api)` and docs | Done: MCP path is the supported path; worker moved to `test/e2e`; unattended extraction in `FOLLOWUPS.md` E |
+| B2 no production extractor | PR #8 `feat(api)` and docs | Done: MCP path is the supported path; since PR #17 `apps/agent/agent/lib/sales-worker.ts` runs on the dispatch tick for the `crm-ollama` and `crm-codex` profiles |
 | B3 root chat in `LOCAL` | PR #8 `refactor(agent)` | Done: `LOCAL` denies every role; settings say so; `FOLLOWUPS.md` D |
 | B4 profile unreachable, framework-named | PR #11 | Done: `crm_integration`, `agent_propose`, `agent_read`; selector and table column |
 | S1 backup path | PR #10 | Done, separate PR |
