@@ -4,6 +4,7 @@ import {
 	dedupeKey,
 	EVENTS_PER_MINUTE,
 	hostAllowed,
+	isSiteId,
 	MAX_EVENTS_PER_BATCH,
 	matchedHost,
 	normalizePath,
@@ -38,7 +39,9 @@ const ADDRESS = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/;
 
 const fieldText = z.string().nullable().catch(null);
 
-export type FormFields = Record<string, string>;
+const formFields = z.record(z.string(), z.string());
+
+export type FormFields = z.infer<typeof formFields>;
 
 type StoredTouch = {
 	source: string;
@@ -51,23 +54,38 @@ type StoredTouch = {
 	at: string;
 };
 
-export interface IncomingEvent {
-	type: string;
-	host: string;
-	path: string;
-	referrer?: string;
-	label?: string;
-	at?: number;
-	fields?: FormFields;
-	touch?: RawTouch;
-	firstTouch?: RawTouch;
-}
+const rawTouch = z.object({
+	source: z.string().optional(),
+	medium: z.string().optional(),
+	campaign: z.string().optional(),
+	term: z.string().optional(),
+	content: z.string().optional(),
+	referrer: z.string().optional(),
+	landing: z.string().optional(),
+	at: z.number().optional(),
+});
 
-export interface IncomingBatch {
-	siteId: string;
-	visitorId: string;
-	events: IncomingEvent[];
-}
+const incomingEvent = z.object({
+	type: z.string(),
+	host: z.string(),
+	path: z.string(),
+	referrer: z.string().optional(),
+	label: z.string().optional(),
+	at: z.number().optional(),
+	fields: formFields.optional(),
+	touch: rawTouch.optional().catch(undefined),
+	firstTouch: rawTouch.optional().catch(undefined),
+});
+
+export const incomingBatch = z.object({
+	siteId: z.string().refine(isSiteId),
+	visitorId: z.string(),
+	events: z.array(incomingEvent),
+});
+
+export type IncomingEvent = z.infer<typeof incomingEvent>;
+
+export type IncomingBatch = z.infer<typeof incomingBatch>;
 
 interface AcceptedEvent {
 	event: IncomingEvent;
