@@ -29,6 +29,7 @@ import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
 import { MailboxModule } from "./mailbox/mailbox.module";
 import { MicrosoftModule } from "./microsoft/microsoft.module";
+import { RecordChangesModule } from "./record-changes/record-changes.module";
 import { SalesModule } from "./sales/sales.module";
 import { SavedViewsModule } from "./saved-views/saved-views.module";
 import { SearchModule } from "./search/search.module";
@@ -87,6 +88,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		SavedViewsModule,
 		IntakeModule,
 		SalesModule,
+		RecordChangesModule,
 	],
 })
 export class AppModule {}

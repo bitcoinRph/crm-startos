@@ -1700,3 +1700,34 @@ model CodexDeviceLogin {
 
   @@map("codexDeviceLogin")
 }
+
+enum RecordChangeOperation {
+  CREATE
+  UPDATE
+}
+
+enum ChangeActorKind {
+  USER
+  API_KEY
+  AGENT
+  SYSTEM
+}
+
+model RecordChange {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity      FieldEntity
+  recordId    String
+  fieldId     String?
+  operation   RecordChangeOperation
+  before      Json?
+  after       Json?
+  actorKind   ChangeActorKind
+  actorId     String?
+  actorUserId String?
+  createdAt   DateTime              @default(now())
+
+  @@index([entity, recordId, createdAt])
+  @@index([actorKind, actorId, createdAt])
+  @@index([createdAt])
+  @@map("recordChange")
+}

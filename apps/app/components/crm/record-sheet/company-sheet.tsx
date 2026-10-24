@@ -34,6 +34,7 @@ import {
 	savingValue,
 } from "@/components/crm/inline-field";
 import { OwnerCell } from "@/components/crm/owner-cell";
+import { RecordChanges } from "@/components/crm/record-changes";
 import { CompanySocials } from "@/components/crm/social-links";
 import { DealStageMenu } from "@/components/crm/stage-change";
 import { Timeline } from "@/components/crm/timeline/timeline";
@@ -205,6 +206,17 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 					value: "activity",
 					label: "Activity",
 					content: <Timeline anchor={{ companyId: company.id }} />,
+				},
+				{
+					value: "changes",
+					label: "Changes",
+					content: (
+						<div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+							<RecordChanges
+								filter={{ entity: "COMPANY", recordId: company.id }}
+							/>
+						</div>
+					),
 				},
 				{
 					value: "agent",
