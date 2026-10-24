@@ -203,7 +203,7 @@ bun's global install cache:
 | `@next/swc-linux-*-musl` | The image is Debian, so glibc. The musl binaries never load. |
 | `@biomejs/cli-linux-*` | Biome only lints. Nothing runs it at runtime. |
 | `@turbo/linux-*` | Turborepo only orchestrates the build. Each process starts through its own package script. |
-| `/root/.bun/install/cache` | The download cache. Nothing reads it once `node_modules` exists. |
+| `/home/node/.bun/install/cache` | The download cache. Nothing reads it once `node_modules` exists. |
 
 **Delete the packages without the cache and you save nothing.** `bun install`
 hardlinks package files out of its cache into `node_modules`, so every large

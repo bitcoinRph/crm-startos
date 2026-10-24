@@ -248,21 +248,54 @@ from the stored permissions, never from the request.
 
 | Profile | Permissions | What it can do |
 | --- | --- | --- |
-| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can |
+| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can, except purge |
 | `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
 | `agent_read` | `crm:read` | Queries only |
+| `intake` | `intake:write` | Call `intake.submit` and nothing else |
 
 - **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales.*`
   procedures decide from the `sales` permissions instead (`sales/sales.auth.ts`):
   a read needs `crm:read` or `sales:read`, a proposal needs
   `sales:proposal:write`, and approval needs a human session, never a key.
 - **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
+- **`companies`, `contacts` and `deals` `purge` and `bulkPurge` are denied to every
+  key,** legacy keys included. Archive and restore stay open to a write key.
 - **A legacy key has null permissions.** It keeps non-sales CRM access. Every `sales.*` call requires explicit permissions.
   The existing table label says *Legacy: full access*. The owner rotates the key; discovery does not grant permissions.
 - **The profile name says what the key can do, not which agent holds it.** The
   free-text `name` is where "hermes" or "openclaw" goes.
+- **Each key is rate-limited.** `API_KEY_RATE_LIMIT` in `packages/auth/src/api-key-config.ts` allows 3,000 key checks per 60 s per key, and one tRPC or MCP call makes two checks. The count resets only after the key is idle for longer than the window, so a continuously busy agent can be paused for up to 60 s. A key over the limit gets `429` or `TOO_MANY_REQUESTS`, and other keys are not affected. Better Auth stores the numbers on each key row at creation, so changing them needs a migration that updates the `apikey` rows.
+- **Every call a key makes leaves one `ApiKeyCall` row**: key id, procedure,
+  `query` or `mutation`, and `allowed` or `denied`. `AuthMiddleware` writes it
+  after the decision through `ApiKeyAuditService.record`, fire-and-forget: a
+  failed write logs a warning and never fails the request. MCP tools reach the
+  same middleware, so they are covered. A `sales.*` call records after the
+  procedure runs: `denied` when it fails with `FORBIDDEN`, else `allowed`. **Never
+  store arguments, headers or bodies** — they carry customer text. Settings → API
+  keys shows the last 50 per key (`apiKeys.calls`, session-only). The archive
+  prune deletes rows older than `archiveRetentionDays`, in batches.
 - **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
   endpoint. `keyFromHeaders` normalises it before the session is resolved.
+
+## Inbound intake is one mutation behind a narrow key
+
+`intake.submit` (`src/intake/`) files a lead from a form, an automation or a payment
+hook. Only the web origin is exposed on StartOS, so it is a tRPC mutation reached at
+`POST /api/trpc/intake.submit` with `Authorization: Bearer crm_…` and a plain JSON body.
+The `intake` key profile holds `intake:write` and nothing else, so a key pasted into a
+third-party handler can create leads but cannot read or change the CRM.
+`crm_integration` and legacy keys can also call it. The MCP tool is `intake_submit`.
+
+- **The email is the identity.** It goes through `normalizeEmail`. An existing contact,
+  archived or not, is reused and gets one more note. A new one has `source` `INTAKE`.
+- **A suppressed address or domain creates nothing.** The answer is `status: "suppressed"`
+  with no contact id. Unlike `contacts.create`, intake never clears a suppression.
+- **A new contact queues the agent.** `AgentTriggerService.contactCreated` writes the
+  `identify` task and `contact.created` event. The API does no enrichment.
+- **The key stays on a server.** Do not put it in browser JavaScript. Anyone who reads the
+  page can then create leads, up to the per-key rate limit.
+- **The note carries the message.** `meta` holds `source: "intake"` and the caller's
+  `source` label. Every length limit is in `intake/intake-config.ts`.
 
 ## Two mail providers, one pipeline
 
@@ -349,6 +382,11 @@ row is still there, just filtered out of every list.
 - **A rep can `purge` straight from the Archived view — retention is a ceiling, not a
   wait.** `bulkPurge`/the per-record "Delete forever" action call it directly, no
   different from the cron.
+- **Only a workspace owner or admin can `purge` or `bulkPurge`, and no API key can.**
+  The routers ask `AgentAccessService.assertCanPurge` (`canPurgeRecords`, `@crm/auth`)
+  and answer a member with `FORBIDDEN`; `authorizeApiKeyProcedure` denies the six
+  purge procedures to every key, so an agent archives and a human purges.
+  `purgeExpired` calls the service directly and is not affected.
 
 **Pruning**: `ArchiveRetentionController` (`internal/archive/prune`, `CRON_SECRET`-gated,
 `apps/api/vercel.json`) reads `AppSetting.archiveRetentionDays`
@@ -391,6 +429,93 @@ ever be summed**. The rules — `baseCurrency`, `countedWhere`/`pendingWhere`, f
 rates, the supported currencies, the keyless feed, and why the fetcher is the one
 documented exception to *no intelligence in the API* — are in **`docs/currency.md`**.
 Read it before touching any amount, total, chart or rate.
+
+## CSV leaves the CRM the same way it comes in
+
+`apps/api/src/csv`. A rep moving away must be able to take every record along, so
+export is a plain query, and an agent can call it too.
+
+- **`csv.export` takes `entity`** (`companies`, `contacts`, `deals`) and returns
+  `{ entity, filename, csv, rows, truncated }`. The MCP tool is `export_csv`. It is a
+  query, so every key profile may call it, and it carries `readOnlyHint`.
+- **Active records only.** `archivedAt` is null. Archived records never leave.
+- **`CSV.export` (`csv-config.ts`) caps it.** `maxRows` stops the export, `truncated`
+  says so, and `pageSize` is how many rows one read holds. The loop pages by id, so no
+  read is unbounded.
+- **`crm/csv.ts` is the only writer.** RFC 4180: a cell with a comma, a quote, CR or LF
+  is quoted, inner quotes double, lines end in CRLF. A cell that starts with `=`, `+`,
+  `-`, `@`, a tab or a CR gets a leading `'`, so a spreadsheet shows it as text.
+- **Columns come from the update contracts** (`csv-columns.ts`), then one
+  `field:<key>` column per active custom field, in field order. `id`, `source` and
+  `createdAt` are information only.
+  - companies: `id, name, domain, website, description, industry, city, stateCode,
+    country, phone, email, linkedinUrl, ownerEmail, source, createdAt`
+  - contacts: `id, firstName, lastName, email, phone, title, linkedinUrl, twitterUrl,
+    githubUrl, companyDomain, companyName, ownerEmail, source, createdAt`
+  - deals: `id, name, description, companyDomain, companyName, stage, closedReason, amount,
+    currency, expectedCloseDate, ownerEmail, createdAt`
+- **A deal `amount` is in major units** (`1234.50`) beside its `currency`. `baseAmount`
+  never leaves, because it is derived (`docs/currency.md`).
+- **Custom fields are written as people read them.** A SELECT is its option label, a
+  USER is the user's email, a DATE is `YYYY-MM-DD` unless it has a time.
+- **The browser downloads the text it gets back.** The list pages build a `Blob` from
+  the query result with a BOM, so Excel reads UTF-8. There is no download route.
+
+### Import: a dry run first, then the same file again
+
+`csv.import` takes `{ entity, csv, dryRun, mapping? }` and returns
+`{ dryRun, create, update, skip, errors[{ row, message }], skipped[{ row, message }], ignoredColumns }`.
+Always send `dryRun: true` first. It reads and plans, and it writes nothing.
+
+- **It is a mutation, so it needs `crm:write`.** A browser session and a
+  `crm_integration` key can import. `agent_propose` and `agent_read` keys are denied by
+  `authorizeApiKeyProcedure`. **There is no MCP tool for it**: an import is a bulk write
+  that an agent cannot take back, so `export_csv` is the only CSV tool.
+- **It reads the headers the export writes**, case-insensitively, so export then import
+  round-trips. `id`, `source` and `createdAt` are read as nothing. `mapping` renames a
+  header to a column (`{ "Account": "name" }`). A `field:<key>` column writes a custom
+  field. Any other column is listed in `ignoredColumns` and left alone.
+  - HubSpot names accepted: companies `Company name`, `Company Domain Name`, `Domain Name`,
+    `Website URL`, `Phone Number`, `Country/Region`, `LinkedIn Company Page`; contacts
+    `First Name`, `Last Name`, `Email Address`, `Phone Number`, `Job Title`,
+    `Company Domain Name`, `Company Name`, `Associated Company`; deals `Deal Name`,
+    `Deal Description`, `Deal Stage`, `Close Date`, `Company Domain Name`, `Company Name`,
+    `Associated Company`. `Email`, `Phone`, `Industry`, `City`, `Amount` and the like
+    already match a column.
+  - **Stages** are the `DealStage` names or their words, in any case: `Closed won`,
+    `CLOSED_WON`, `Unqualified`. A stage the CRM does not have is a row error.
+- **Rows are validated with Zod.** A bad row is a line in `errors` with its row number
+  and the other rows still run. Row 2 is the first row below the header. A row counts
+  once, however many lines a quoted cell spans. A file with no usable header, an
+  unclosed quote, or more rows or bytes than `CSV.import` allows is refused whole, with
+  `BAD_REQUEST`.
+- **Dedupe keys.** Companies match on `domain`; a company with no domain matches an
+  active company with no domain and the same name. Contacts match on email, any case
+  (`normalizeEmail`). Deals match on name plus company. Archived records never match.
+  The same key twice in one file is an error on the second row.
+- **A match is updated, and only where the file differs.** A blank cell never clears a
+  value. A row that would change nothing is counted in `skip`. This matters for deals: a
+  changed `amount` or `currency` goes through `deals.update`, which freezes a new rate
+  (`docs/currency.md`), and an unchanged one is never sent, so re-importing an old file
+  does not move a closed quarter.
+- **Records first, associations second.** Contacts and deals name their company by
+  `companyDomain`, or by `companyName` when the file has no domain. The company must
+  already exist, so import companies, then contacts, then deals. A company that cannot
+  be found is a row error. A contact with a company and no `companyDomain` keeps the
+  company that `contacts.create` finds from the email domain, as for a manual create.
+- **Writes go through `CompaniesService`, `ContactsService` and `DealsService`**, one
+  call per row, so CRM events and the agent's `AgentTask` rows are written as for a
+  manual create, and the frozen exchange rate comes from `ConversionService`. Created
+  companies and contacts carry `source = IMPORT` (the services take it as an option, the
+  tRPC inputs do not). A deal has no source. Each service call is its own transaction:
+  a failed row never rolls back the others, and `MAX_BULK_IDS` rows form one batch.
+- **A removed contact stays removed.** An email in `SuppressedContact` that has no active
+  contact is counted in `skip`, with the reason in `skipped`. `contacts.create` lifts a
+  suppression because a rep typed the address; a file is not a rep.
+- **A deal needs an owner.** A blank `ownerEmail` is the person who runs the import.
+  `ownerEmail` must be the email of a user; an unknown one is a row error.
+- **`CSV.import` (`csv-config.ts`)** caps `maxRows` (500) and `maxBytes` (2 MiB). Every
+  row is several writes and a Vercel function stops at 60 seconds. Split a bigger file.
 
 ## Freshness: invalidate the query, don't disable the cache
 

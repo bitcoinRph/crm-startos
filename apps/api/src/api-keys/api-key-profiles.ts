@@ -4,6 +4,7 @@ export const API_KEY_PROFILES = [
 	"crm_integration",
 	"agent_propose",
 	"agent_read",
+	"intake",
 ] as const;
 
 export type ApiKeyProfile = (typeof API_KEY_PROFILES)[number];
@@ -18,6 +19,7 @@ export const KEY_PERMISSIONS = {
 	crm_integration: { crm: ["read", "write"] },
 	agent_propose: { crm: ["read"], sales: ["read", "proposal:write"] },
 	agent_read: { crm: ["read"] },
+	intake: { intake: ["write"] },
 } satisfies Record<ApiKeyProfile, ApiKeyPermissions>;
 
 function canonical(permissions: ApiKeyPermissions): string {

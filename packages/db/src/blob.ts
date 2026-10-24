@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isMirrored } from "./images";
+import { mediaDir, mediaName, mediaPath, writeMedia } from "./media";
 import { safeFetch } from "./safe-fetch";
 
 export { isMirrored, isOptimizable } from "./images";
@@ -20,19 +21,24 @@ const ALLOWED: ExtensionByMediaType = {
 	"image/vnd.microsoft.icon": "ico",
 };
 
-export function blobEnabled(): boolean {
+function blobEnabled(): boolean {
 	return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+}
+
+export function mirrorEnabled(): boolean {
+	return mediaDir() !== null || blobEnabled();
 }
 
 export async function mirror(
 	sourceUrl: string,
 	prefix: string,
+	fetchSource: typeof safeFetch = safeFetch,
 ): Promise<string | null> {
-	if (!blobEnabled()) return null;
+	if (!mirrorEnabled()) return null;
 	if (isMirrored(sourceUrl)) return sourceUrl;
 
 	try {
-		const result = await safeFetch(sourceUrl, { timeoutMs: TIMEOUT_MS });
+		const result = await fetchSource(sourceUrl, { timeoutMs: TIMEOUT_MS });
 		if (!result?.response.ok) return null;
 
 		const { response } = result;
@@ -47,6 +53,13 @@ export async function mirror(
 			.update(bytes)
 			.digest("hex")
 			.slice(0, 12);
+
+		const dir = mediaDir();
+		if (dir) {
+			const name = mediaName(prefix, digest, extension);
+			await writeMedia(dir, name, bytes);
+			return mediaPath(name);
+		}
 
 		const { put } = await import("@vercel/blob");
 

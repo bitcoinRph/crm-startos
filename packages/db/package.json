@@ -20,6 +20,7 @@
 		"./images": "./src/images.ts",
 		"./idempotency": "./src/idempotency.ts",
 		"./json": "./src/json.ts",
+		"./media": "./src/media.ts",
 		"./safe-fetch": "./src/safe-fetch.ts",
 		"./sales": "./src/sales.ts",
 		"./settings": "./src/settings.ts",

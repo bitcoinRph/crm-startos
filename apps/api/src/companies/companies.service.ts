@@ -271,7 +271,10 @@ export class CompaniesService {
 		});
 	}
 
-	async create(input: CompanyCreateInput) {
+	async create(
+		input: CompanyCreateInput,
+		options: { source?: RecordSource } = {},
+	) {
 		const domain = normalizeDomain(input.domain);
 
 		if (domain) {
@@ -293,6 +296,7 @@ export class CompaniesService {
 					domain,
 					website: domain ? `https://${domain}` : null,
 					ownerId: input.ownerId ?? null,
+					source: options.source,
 				},
 				select: { id: true, name: true, domain: true, createdAt: true },
 			});

@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./activity-meta": "./src/activity-meta.ts",
+		"./agent-approval": "./src/agent-approval.ts",
 		"./agent-events": "./src/agent-events.ts",
 		"./agent-manifest": "./src/agent-manifest.ts",
 		"./builder-question": "./src/builder-question.ts",

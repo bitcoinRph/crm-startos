@@ -33,6 +33,10 @@ export function canManageConnections(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export function canPurgeRecords(role: WorkspaceRole | null): boolean {
+	return isWorkspaceAdmin(role);
+}
+
 export function canManageTracking(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }

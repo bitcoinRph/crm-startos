@@ -1,13 +1,15 @@
 import { auth } from "@crm/auth";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
 import type {
 	MiddlewareOptions,
 	MiddlewareResponse,
 	TRPCMiddleware,
 } from "nestjs-trpc";
+import { ApiKeyAuditService } from "../../api-keys/api-key-audit.service";
 import { setRequestUserId } from "../../logging/request-context";
 import {
+	apiKeyRateLimited,
 	authorizeApiKeyProcedure,
 	keyFromHeaders,
 	type VerifiedApiKey,
@@ -21,10 +23,12 @@ export async function verifiedApiKey(
 	const key = ctx.req ? keyFromHeaders(ctx.req.headers) : null;
 	if (!key) return null;
 	const verified = await auth.api.verifyApiKey({ body: { key } });
+	if (verified.error?.code === "RATE_LIMITED") throw apiKeyRateLimited();
 	if (!verified.valid || !verified.key || verified.key.referenceId !== userId) {
 		throw new TRPCError({ code: "FORBIDDEN", message: "API key denied." });
 	}
 	return {
+		id: verified.key.id,
 		referenceId: verified.key.referenceId,
 		permissions: verified.key.permissions ?? null,
 	};
@@ -32,13 +36,31 @@ export async function verifiedApiKey(
 
 @Injectable()
 export class AuthMiddleware implements TRPCMiddleware {
+	constructor(
+		@Inject(ApiKeyAuditService) private readonly audit: ApiKeyAuditService,
+	) {}
+
 	async use(opts: MiddlewareOptions): Promise<MiddlewareResponse> {
 		const ctx = opts.ctx as BaseTrpcContext;
 		const user = ctx.session?.user;
 		if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
 		const key = await verifiedApiKey(ctx, user.id);
-		if (key && authorizeApiKeyProcedure(key, opts.path, opts.type) === "deny") {
+		const decision = key
+			? authorizeApiKeyProcedure(key, opts.path, opts.type)
+			: null;
+		const record = (outcome: "allowed" | "denied") => {
+			if (key)
+				this.audit.record({
+					keyId: key.id,
+					procedure: opts.path,
+					type: opts.type,
+					outcome,
+				});
+		};
+
+		if (decision === "deny") {
+			record("denied");
 			throw new TRPCError({
 				code: "FORBIDDEN",
 				message: "API key scope denied.",
@@ -47,6 +69,18 @@ export class AuthMiddleware implements TRPCMiddleware {
 
 		setRequestUserId(user.id);
 		const nextCtx: AuthedTrpcContext = { ...ctx, user };
-		return opts.next({ ctx: nextCtx });
+
+		if (decision !== "sales") {
+			record("allowed");
+			return opts.next({ ctx: nextCtx });
+		}
+
+		const result = await opts.next({ ctx: nextCtx });
+		const refused =
+			!result.ok &&
+			result.error instanceof TRPCError &&
+			result.error.code === "FORBIDDEN";
+		record(refused ? "denied" : "allowed");
+		return result;
 	}
 }

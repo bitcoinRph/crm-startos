@@ -67,7 +67,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "dashboard_summary",
 		procedure: "dashboard.summary",
 		description:
-			"Pipeline totals, open deals by stage and recent activity, for the caller or for everyone.",
+			"Pipeline totals, the weighted forecast, open deals by stage and recent activity, for the caller or for everyone.",
 	},
 	{
 		name: "list_contacts",
@@ -195,9 +195,21 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description: "Mark a task done, or reopen it with completed set to false.",
 	},
 	{
+		name: "intake_submit",
+		procedure: "intake.submit",
+		description:
+			"File a lead. Pass an email and, if known, a name, company name or domain, a message and a short source label such as website-form. Finds the contact by email or creates it, logs the message as a note and queues research in the background. Returns the contact id and whether it was created, or status suppressed for an address a rep deleted. This is the only tool a key with the intake profile can call.",
+	},
+	{
 		name: "list_fields",
 		procedure: "fields.list",
 		description:
 			"The custom field definitions of an entity (COMPANY, CONTACT or DEAL), with the keys that update tools accept under data.fields.",
+	},
+	{
+		name: "export_csv",
+		procedure: "csv.export",
+		description:
+			"Export every active (not archived) record of one entity as CSV text. entity is companies, contacts or deals. Custom fields are extra field:<key> columns. Deal amounts are in major units, such as 1234.50, beside a currency column. Cells that start with = + - @ get a leading single quote. Returns csv, rows and truncated, which is true when the row cap cut the export short.",
 	},
 ];

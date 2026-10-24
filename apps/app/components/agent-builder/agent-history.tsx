@@ -70,12 +70,16 @@ export function AgentRuns({
 	cancelling,
 	onRetry,
 	retryingRunId,
+	onDecide,
+	deciding,
 }: {
 	runs: Runs;
 	onCancel: (runId: string) => void;
 	cancelling: boolean;
 	onRetry: (runId: string) => void;
 	retryingRunId?: string;
+	onDecide: (runId: string, decision: "APPROVE" | "REJECT") => void;
+	deciding: boolean;
 }) {
 	const [outcome, setOutcome] = useState("ALL");
 	const [expanded, setExpanded] = useState<string | null>(null);
@@ -137,6 +141,17 @@ export function AgentRuns({
 									{humanStatus(run.triggerType)} · {formatDate(run.createdAt)} ·
 									Version {run.version.number}
 								</span>
+								{run.pendingApproval ? (
+									<span className="mt-1.5 block min-w-0 rounded-md bg-muted px-2.5 py-1.5">
+										<span className="block text-muted-foreground text-xs">
+											Waiting for approval to post to{" "}
+											{run.pendingApproval.destination}
+										</span>
+										<span className="block whitespace-pre-wrap wrap-break-word text-sm">
+											{run.pendingApproval.text}
+										</span>
+									</span>
+								) : null}
 								{run.status === "FAILED" || run.status === "CANCELLED" ? (
 									<span className="mt-1.5 flex min-w-0 items-start gap-2 rounded-md bg-destructive/10 px-2.5 py-1.5">
 										<Icon
@@ -172,6 +187,26 @@ export function AgentRuns({
 								>
 									<Icon icon={Renew} data-icon="inline-start" />
 									Retry
+								</Button>
+							</span>
+						) : null}
+
+						{run.pendingApproval?.canDecide ? (
+							<span className="flex shrink-0 items-center gap-2 pr-4 sm:pr-5">
+								<Button
+									size="sm"
+									disabled={deciding}
+									onClick={() => onDecide(run.id, "APPROVE")}
+								>
+									Approve
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={deciding}
+									onClick={() => onDecide(run.id, "REJECT")}
+								>
+									Reject
 								</Button>
 							</span>
 						) : null}

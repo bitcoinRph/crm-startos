@@ -38,7 +38,7 @@ import { InjectDatabase } from "../database/database.constants";
 import { TrackingConfigService } from "./tracking-config.service";
 import { TrackingCounterService } from "./tracking-counter.service";
 import {
-	type IncomingBatch,
+	incomingBatch,
 	TrackingIngestService,
 } from "./tracking-ingest.service";
 import { TrackingRollupService } from "./tracking-rollup.service";
@@ -109,17 +109,17 @@ export class TrackingController {
 		const raw = await read(request, MAX_BODY_BYTES);
 		if (!raw) return;
 
-		let batch: IncomingBatch;
+		let parsed: ReturnType<typeof incomingBatch.safeParse>;
 		try {
-			batch = JSON.parse(raw) as IncomingBatch;
+			parsed = incomingBatch.safeParse(JSON.parse(raw));
 		} catch {
 			return;
 		}
 
-		if (!isSiteId(batch?.siteId) || !Array.isArray(batch?.events)) return;
+		if (!parsed.success) return;
 
 		try {
-			await this.ingest.accept(batch, {
+			await this.ingest.accept(parsed.data, {
 				origin: origin ?? null,
 				userAgent: userAgent ?? null,
 			});

@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
+import { SessionOnlyMiddleware } from "../trpc/middlewares/session-only.middleware";
 import { restMeta } from "../trpc/openapi";
 import { AgentDefinitionsService } from "./agent-definitions.service";
 import { AgentRunsService } from "./agent-runs.service";
@@ -19,6 +20,8 @@ import {
 	agentByIdOutput,
 	agentCancelRunInput,
 	agentCancelRunOutput,
+	agentDecideApprovalInput,
+	agentDecideApprovalOutput,
 	agentDeployInput,
 	agentDeployOutput,
 	agentFilesOutput,
@@ -229,5 +232,18 @@ export class AgentsRouter {
 		@Input() input: z.infer<typeof agentCancelRunInput>,
 	) {
 		return this.runs.cancelRun(input, ctx.user.id);
+	}
+
+	@Mutation({
+		input: agentDecideApprovalInput,
+		output: agentDecideApprovalOutput,
+		meta: restMeta("POST", "/agents/{id}/runs/{runId}/approval", ["Agents"]),
+	})
+	@UseMiddlewares(SessionOnlyMiddleware)
+	async decideRunApproval(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof agentDecideApprovalInput>,
+	) {
+		return this.runs.decideApproval(input, ctx.user.id);
 	}
 }

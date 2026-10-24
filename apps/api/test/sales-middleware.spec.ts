@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { API_KEY_HEADER, auth } from "@crm/auth";
+import type { Db } from "@crm/db";
 import type { MiddlewareOptions } from "nestjs-trpc";
+import { ApiKeyAuditService } from "../src/api-keys/api-key-audit.service";
 import { salesActor } from "../src/sales/sales.auth";
 import { SALES_SCOPES } from "../src/sales/sales.service";
 import type { AuthedTrpcContext } from "../src/trpc/context.types";
@@ -36,7 +38,9 @@ function request(headers: TestHeaders, path = "contacts.list", type = "query") {
 	return { opts, next };
 }
 
-const middleware = new AuthMiddleware();
+const audit = new ApiKeyAuditService({} as Db);
+spyOn(audit, "record").mockImplementation(() => undefined);
+const middleware = new AuthMiddleware(audit);
 
 describe("ordinary API key authorization", () => {
 	it("keeps legacy unscoped member reads and mutations", async () => {

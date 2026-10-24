@@ -7,14 +7,19 @@ import {
   appDir,
   appPort,
   assetsDir,
+  crmUser,
+  crmVolumePaths,
   csvList,
   localInferenceContextWindowTokens,
+  mediaDir,
   ollamaHostId,
   ollamaPackageId,
   ollamaPort,
   postgresDb,
   postgresPort,
   postgresUser,
+  sandboxCacheDir,
+  workflowDataDir,
 } from './utils'
 
 const origin = (url: string) => new URL(url).origin
@@ -114,6 +119,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     AGENT_URL: `http://127.0.0.1:${agentPort}`,
     AGENT_BRIDGE_SECRET: store.bridgeSecret,
     CRON_SECRET: store.cronSecret,
+    CRM_MEDIA_DIR: mediaDir,
     ...optional('CRM_SECRETS_KEY', store.secretsKey),
     CRM_INFERENCE_MODE: inferenceMode,
     ...optional('CRM_LOCAL_INFERENCE_ALLOWED_HOSTS', localInferenceHost),
@@ -149,13 +155,19 @@ export const main = sdk.setupMain(async ({ effects }) => {
       .mountVolume({
         volumeId: 'main',
         subpath: 'agent/workflow-data',
-        mountpoint: `${appDir}/apps/agent/.eve/.workflow-data`,
+        mountpoint: workflowDataDir,
         readonly: false,
       })
       .mountVolume({
         volumeId: 'main',
         subpath: 'agent/sandbox-cache',
-        mountpoint: `${appDir}/apps/agent/.eve/sandbox-cache`,
+        mountpoint: sandboxCacheDir,
+        readonly: false,
+      })
+      .mountVolume({
+        volumeId: 'main',
+        subpath: 'media',
+        mountpoint: mediaDir,
         readonly: false,
       })
       .mountAssets({ subpath: null, mountpoint: assetsDir }),
@@ -194,20 +206,30 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: [],
     })
+    .addOneshot('crm-volume-owner', {
+      subcontainer: crmSub,
+      exec: {
+        command: ['chown', '-R', `${crmUser}:${crmUser}`, ...crmVolumePaths],
+        user: 'root',
+      },
+      requires: [],
+    })
     .addOneshot('migrate', {
       subcontainer: crmSub,
       exec: {
         command: ['bunx', 'prisma', 'migrate', 'deploy'],
         cwd: `${appDir}/packages/db`,
+        user: crmUser,
         env,
       },
-      requires: ['postgres'],
+      requires: ['postgres', 'crm-volume-owner'],
     })
     .addOneshot('local-account', {
       subcontainer: crmSub,
       exec: {
         command: ['bun', 'scripts/local-account.ts'],
         cwd: `${appDir}/apps/api`,
+        user: crmUser,
         env: {
           ...env,
           LOCAL_ACCOUNT_EMAIL: store.admin.email,
@@ -221,6 +243,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: ['bun', 'dist/main.js'],
         cwd: `${appDir}/apps/api`,
+        user: crmUser,
         env: { ...env, PORT: String(apiPort) },
       },
       ready: {
@@ -242,6 +265,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: ['bun', 'run', 'start'],
         cwd: `${appDir}/apps/app`,
+        user: crmUser,
         env: { ...env, PORT: String(appPort) },
       },
       ready: {
@@ -260,6 +284,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: ['bun', 'run', 'start'],
         cwd: `${appDir}/apps/agent`,
+        user: crmUser,
         env: { ...env, AGENT_PORT: String(agentPort) },
       },
       ready: {
@@ -278,6 +303,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: ['node', `${assetsDir}/scheduler.mjs`],
         cwd: appDir,
+        user: crmUser,
         env: {
           API_INTERNAL_URL: `http://127.0.0.1:${apiPort}`,
           CRON_SECRET: store.cronSecret,

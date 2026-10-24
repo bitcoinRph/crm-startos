@@ -10,7 +10,7 @@ import {
 	type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Logger } from "@nestjs/common";
-import type { AnyRouter } from "@trpc/server";
+import { type AnyRouter, TRPCError } from "@trpc/server";
 import {
 	callProcedure,
 	getProcedureAtPath,
@@ -129,6 +129,23 @@ function acceptBearerApiKey(req: Request): void {
 	}
 }
 
+async function refuse(
+	req: Request,
+	res: Response,
+	status: number,
+	error: string,
+): Promise<void> {
+	try {
+		const drained = finished(req, { cleanup: true });
+		req.resume();
+		await drained;
+	} catch {
+		res.destroy();
+		return;
+	}
+	res.status(status).json({ error });
+}
+
 export function createMcpBridge(router: AnyRouter): McpBridge {
 	const logger = new Logger("McpBridge");
 	const bound = bindTools(router);
@@ -148,20 +165,24 @@ export function createMcpBridge(router: AnyRouter): McpBridge {
 
 		acceptBearerApiKey(req);
 
-		const ctx = await createBaseTrpcContext(req);
-
-		if (!ctx.session) {
-			try {
-				const drained = finished(req, { cleanup: true });
-				req.resume();
-				await drained;
-			} catch {
-				res.destroy();
+		let ctx: BaseTrpcContext;
+		try {
+			ctx = await createBaseTrpcContext(req);
+		} catch (error) {
+			if (error instanceof TRPCError && error.code === "TOO_MANY_REQUESTS") {
+				await refuse(req, res, 429, error.message);
 				return;
 			}
-			res.status(401).json({
-				error: `Send a CRM API key in the ${API_KEY_HEADER} header or as a Bearer token.`,
-			});
+			throw error;
+		}
+
+		if (!ctx.session) {
+			await refuse(
+				req,
+				res,
+				401,
+				`Send a CRM API key in the ${API_KEY_HEADER} header or as a Bearer token.`,
+			);
 			return;
 		}
 

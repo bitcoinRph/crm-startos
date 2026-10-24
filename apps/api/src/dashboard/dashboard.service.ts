@@ -5,7 +5,9 @@ import { Injectable } from "@nestjs/common";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
+import { archivedFilter } from "../trpc/list-input";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
+import { DASHBOARD } from "./dashboard-config";
 
 const OWNER_SELECT = {
 	id: true,
@@ -39,7 +41,8 @@ export class DashboardService {
 
 	async summary(actingUserId: string, input: DashboardSummaryInput) {
 		const mine = input.scope === "me";
-		const owned = mine ? { ownerId: actingUserId } : {};
+		const active = archivedFilter(false);
+		const owned = mine ? { ...active, ownerId: actingUserId } : active;
 
 		const now = new Date();
 		const startOfMonth = monthStart(now, 0);
@@ -56,6 +59,7 @@ export class DashboardService {
 			openValueByStage,
 			recentDeals,
 			closingThisMonthTotals,
+			closingThisMonthByStage,
 			biggestOpen,
 			overdueTasks,
 			recentActivity,
@@ -101,6 +105,20 @@ export class DashboardService {
 					],
 				},
 				_count: { _all: true },
+				_sum: { baseAmount: true },
+			}),
+			this.db.deal.groupBy({
+				by: ["stage"],
+				where: {
+					AND: [
+						{
+							...owned,
+							stage: { in: [...OPEN_DEAL_STAGES] },
+							expectedCloseDate: { gte: startOfMonth, lt: startOfNextMonth },
+						},
+						counted,
+					],
+				},
 				_sum: { baseAmount: true },
 			}),
 			this.db.deal.findMany({
@@ -178,6 +196,25 @@ export class DashboardService {
 			};
 		});
 
+		const weigh = (stage: (typeof OPEN_DEAL_STAGES)[number], cents: number) =>
+			Math.round(cents * DASHBOARD.forecast.stageProbability[stage]);
+
+		const forecastStages = OPEN_DEAL_STAGES.map((stage) => ({
+			stage,
+			probability: DASHBOARD.forecast.stageProbability[stage],
+			weightedCents: weigh(
+				stage,
+				stages.find((row) => row.stage === stage)?.valueCents ?? 0,
+			),
+		}));
+
+		const closingThisMonthCents = OPEN_DEAL_STAGES.reduce((total, stage) => {
+			const row = closingThisMonthByStage.find(
+				(group) => group.stage === stage,
+			);
+			return total + weigh(stage, toCents(row?._sum.baseAmount ?? null) ?? 0);
+		}, 0);
+
 		const firstBucket = monthKey(trendStart);
 		const trend = Array.from({ length: TREND_MONTHS }, (_, index) => ({
 			month: MONTH_LABEL.format(monthStart(trendStart, index)),
@@ -241,6 +278,14 @@ export class DashboardService {
 				stages,
 				totalCents: stages.reduce((total, s) => total + s.valueCents, 0),
 				totalDeals: stages.reduce((total, s) => total + s.count, 0),
+			},
+			forecast: {
+				stages: forecastStages,
+				totalCents: forecastStages.reduce(
+					(total, row) => total + row.weightedCents,
+					0,
+				),
+				closingThisMonthCents,
 			},
 			wonThisMonth,
 			wonPrevMonth,

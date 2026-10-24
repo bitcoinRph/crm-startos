@@ -65,6 +65,7 @@ export type DraftAction =
 				id: string;
 				label: string;
 			};
+			requiresApproval?: boolean;
 	  };
 
 export type DraftAgentInput = {

@@ -35,6 +35,10 @@
 
 ## Downloading and Building the `.s9pk`
 
+Package `1.20.0:0` runs the `crm` daemons and oneshots as the `node` user, after a root `crm-volume-owner`
+oneshot gives that user the writable volume paths. It mounts `main/media` at `/data/media` for pictures.
+It adds three database migrations, applied by the `migrate` oneshot on start. Credentials are unchanged.
+
 Built packages are published on the repository's [Releases](https://github.com/bitcoinRph/crm-startos/releases) page, one release per package version, tagged `startos-v<version>` with the colon written as a hyphen. Each release carries both architectures and a `checksums.txt`:
 
 | File | Server |
@@ -44,9 +48,9 @@ Built packages are published on the repository's [Releases](https://github.com/b
 
 Download one, open your StartOS device in a browser, then click **Sideload** in the top navigation bar and select it.
 
-`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**, then publishes them. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
+`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**. Only runs on `release` publish packages. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
 
-The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one, so **raise that version before merging whenever an existing install has to update**. A merge that leaves it alone replaces the files on the existing release instead of publishing a new one, which is what a fresh install wants and what an update cannot use.
+The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one. Raise that version for each package release. Publication creates a new draft and publishes it after uploading both architectures and checksums. An existing release tag stops publication. The workflow never replaces existing assets.
 
 To build locally instead, install [Docker](https://docs.docker.com/engine/install/), Node.js 22 or newer and [`start-cli`](https://start9.com/start-cli/install.sh), create a packaging workspace once in the directory that holds the clone, then build from this directory:
 
@@ -65,17 +69,20 @@ make x86
 | `crm` | Built by the root `Dockerfile` from this repository: Node 24 with Bun, `bun install --frozen-lockfile`, `bun run build` | x86_64, aarch64 |
 | `postgres` | Official `postgres` image, 17 on Alpine | x86_64, aarch64 |
 
-Six daemons and two oneshots run from those two images, in this order:
+Five daemons and three oneshots run from those two images, in this order:
 
 | Name | Kind | Command | Purpose |
 | --- | --- | --- | --- |
 | `postgres` | daemon | image entrypoint, `listen_addresses=127.0.0.1` | The database, loopback only |
+| `crm-volume-owner` | oneshot (root) | `chown -R node:node` on the two mounted agent paths | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root |
 | `migrate` | oneshot | `bunx prisma migrate deploy` in `packages/db` | Applies pending migrations on every start |
 | `local-account` | oneshot | `bun scripts/local-account.ts` in `apps/api` | Creates or resets the password account from the store |
 | `api` | daemon | `bun dist/main.js` in `apps/api`, port 3001 | NestJS API, tRPC, auth, MCP |
 | `app` | daemon | `bun run start` (`next start`, `PORT=3000`) in `apps/app` | The web app; proxies `/api/*` to the API on its own origin |
 | `agent` | daemon | `bun run start` (`eve start`, port 2000) in `apps/agent` | The eve research agent with its own schedule |
 | `scheduler` | daemon | `node /assets/scheduler.mjs` | Calls the API's `/internal/*` cron routes with `CRON_SECRET` |
+
+Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, runs `chown -R node:node` on the two mounted agent paths before `migrate` so installs that wrote them as root keep working. `postgres` is unchanged.
 
 Only port 3000 is bound to an interface. The API and the agent are reachable on loopback inside the container only; the agent's `/eve/v1/*` routes accept any loopback request without a token, so the agent port must never be exposed.
 
@@ -88,13 +95,16 @@ One volume, `main`:
 | `postgresql/` | `/var/lib/postgresql` in `postgres` | The database cluster (`PGDATA=/var/lib/postgresql/data`) |
 | `agent/workflow-data/` | `/app/apps/agent/.eve/.workflow-data` in `crm` | eve's durable workflow runs |
 | `agent/sandbox-cache/` | `/app/apps/agent/.eve/sandbox-cache` in `crm` | The agent's just-bash sandbox filesystem |
+| `media/` | `/data/media` in `crm` | Contact photos, logos and avatars, one file per picture, named by a hash of its bytes |
 | `store.json` | not mounted; read by the package | Generated secrets, the sign-in and agent configuration, the password account |
+
+`CRM_MEDIA_DIR=/data/media` points the API, the app and the agent at `media/`. The agent and the API write there; the app serves the files at `/media/<name>` on its own origin, without a session. Backups copy `media/` with the rest of the volume.
 
 `store.json` holds `postgresPassword`, `authSecret` (`BETTER_AUTH_SECRET`), `bridgeSecret` (`AGENT_BRIDGE_SECRET`), `cronSecret` (`CRON_SECRET`), `admin` (email and password of the password account), `signIn` and `agent` (research-agent and local-inference configuration).
 
 ## Installation and First-Run Flow
 
-1. On install, `seedSecrets` generates the four secrets above.
+1. On install, `seedSecrets` generates the four secrets above. On install and on any start where it is missing, it also writes `secretsKey` (`CRM_SECRETS_KEY`), the key that seals Codex credentials.
 2. `watchAdminCredentials` raises a critical task pointing at **Set Sign-in Credentials** while no password account is stored. The service cannot start until it is run.
 3. On every start `main.ts` composes the environment from the store and the service's own addresses, runs the migrations, applies the password account, then starts the API, the app, the agent and the scheduler.
 4. The first person to sign in becomes the workspace owner, as upstream; the web app then runs its own onboarding for the workspace name and website.
@@ -109,7 +119,7 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | `API_URL` (the public URL) and `APP_URL` (every non-local address of the Web UI) | Agent model, Context key, archive retention (Settings → General) |
 | Google and Microsoft OAuth clients, Microsoft tenant | SSO providers (Settings → SSO), API keys (Settings → API keys) |
 | `AI_GATEWAY_API_KEY`, `CRM_INFERENCE_MODE`, `CRM_LOCAL_INFERENCE_JSON`, `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`, `PERPLEXITY_API_KEY`, `GITHUB_TOKEN`, `BLOB_READ_WRITE_TOKEN`, telemetry | Slack connection, tracking settings |
-| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, all five secrets (including `CRM_SECRETS_KEY`), `NODE_ENV=production` | Codex connection per user (Settings → General → Codex) |
+| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, `CRM_MEDIA_DIR=/data/media`, all five secrets (including `CRM_SECRETS_KEY`), `NODE_ENV=production` | Codex connection per user (Settings → General → Codex) |
 
 `APP_URL` is recomputed whenever the service's addresses change, so a new domain or a disabled gateway restarts the service with the right trusted origins. `API_URL` is the **Public URL** from **Configure Sign-in**, or else the first public address, or else the first address of the Web UI.
 
@@ -137,7 +147,34 @@ Every action writes `store.json`; `main.ts` reads the store with `.const()`, so 
 
 `sdk.Backups.withPgDump` dumps the `crm` database with `pg_dump` and restores it with `pg_restore` into a fresh cluster. The rest of the `main` volume is rsynced with `postgresql/` excluded, so `store.json` and the agent's workflow data travel with the backup.
 
-**Backup path:** `pgdataPath` is set to `/postgresql/data` because the runtime cluster lives at `main/postgresql/data` under `PGDATA=/var/lib/postgresql/data`. Disposable restore tests are not performed on this branch; use a disposable StartOS instance with synthetic data before production restore.
+**Backup path:** `pgdataPath` is set to `/postgresql/data` because the runtime cluster lives at `main/postgresql/data` under `PGDATA=/var/lib/postgresql/data`.
+
+### Restore drill
+
+Run this on a disposable StartOS server with synthetic data only. Never use real customer data. It proves that a backup carries the records, the archive state and the sealed Codex credential.
+
+1. Install the package on the disposable server and run **Set Sign-in Credentials**.
+2. Sign in. In **Settings → API keys**, create one `crm_integration` key and two `agent_propose` keys. Run `scripts/smoke-startos.sh` with them as `ADMIN_KEY`, `HERMES_KEY` and `OPENCLAW_KEY`, so the server holds a synthetic contact and two sales proposals. Archive one contact on the Contacts page.
+3. In **Settings → General → Codex**, connect an OpenAI API key or a ChatGPT account and choose a model. Ask the agent one question on a record and keep the answer.
+4. Record the counts. Run the commands below with `CRM_URL` set and `CRM_KEY` set to the `crm_integration` key, and save the output as `before.txt`:
+
+   ```sh
+   count() {
+     curl -sS "$CRM_URL/api/mcp" -H "Authorization: Bearer $CRM_KEY" \
+       -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+       -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$1\",\"arguments\":{\"pageSize\":1,\"archived\":$2}}}" \
+       | jq -r '.result.content[0].text' | jq -r '.total'
+   }
+   for tool in list_contacts list_companies list_deals; do
+     echo "$tool active=$(count $tool false) archived=$(count $tool true)"
+   done
+   ```
+
+   Also write down the **Connected as** label and the **Since** time from the Codex card.
+5. Create a backup in StartOS. Uninstall the package. Restore it from that backup.
+6. Run the same commands again and save the output as `after.txt`. `diff before.txt after.txt` must print nothing.
+7. Open the Codex card. The label and the **Since** time must match step 4. Ask the agent a new question on the same record. A reply proves that `CRM_SECRETS_KEY` and the sealed credential came back together.
+8. If any step fails, the backup is not trusted. Open an issue with the step number and the output.
 
 ## Local inference
 
@@ -176,7 +213,7 @@ Pull the model inside the Ollama service before naming it here (`ollama pull qwe
 2. **Google sign-in needs a public domain.** Google refuses `.local` redirect URIs. Set **Public URL** to a domain of this server; the Google and Microsoft callback paths are `/api/auth/callback/google` and `/api/auth/callback/microsoft` on that origin.
 3. **Inference is operator-selected, Codex is per user.** **Configure Local Inference** selects a verified local profile and never falls back to cloud inference. Without local configuration, a Vercel AI Gateway key selects explicit legacy mode. With neither configuration, inference stays disabled. A user who connects Codex and chooses a model gets the research chat on Codex in every mode. Builder and runner workflows remain available only in legacy mode.
 4. **The agent's sandbox is just-bash.** No Docker and no microsandbox exist inside the service, so eve's `defaultBackend()` falls through to the pure-JavaScript interpreter: a virtual filesystem with no real binaries and no network.
-5. **Pictures need Vercel Blob.** Without `BLOB_READ_WRITE_TOKEN` contacts keep no photograph and logos are hotlinked, as upstream documents.
+5. **Pictures live on the volume.** `CRM_MEDIA_DIR` is always set, so photographs and logos are copied to `media/` and need no Vercel Blob account. It takes precedence over `BLOB_READ_WRITE_TOKEN`; a token still entered in **Configure Research Agent** is not used for new pictures, and pictures already in Blob keep working. The files are public to anyone who knows the exact name, as Blob URLs are.
 6. **Telemetry is off by default** (`CRM_TELEMETRY_DISABLED=1`), the reverse of upstream. The toggle is in **Configure Research Agent**.
 7. **The scheduler replaces Vercel Cron.** `assets/scheduler.mjs` calls mailbox sync every five minutes and the rates, telemetry, retention and archive routes daily, each one minute after start.
 8. **OAuth tokens and third-party keys are stored in plaintext in Postgres**, as upstream, except Codex credentials, which are sealed under `CRM_SECRETS_KEY`. The volume is the boundary.
@@ -202,11 +239,11 @@ See [AGENTS.md](AGENTS.md).
 package_id: crm
 architectures: [x86_64, aarch64]
 volumes:
-  main: /var/lib/postgresql (postgresql/), /app/apps/agent/.eve/.workflow-data (agent/workflow-data/), /app/apps/agent/.eve/sandbox-cache (agent/sandbox-cache/)
+  main: /var/lib/postgresql (postgresql/), /app/apps/agent/.eve/.workflow-data (agent/workflow-data/), /app/apps/agent/.eve/sandbox-cache (agent/sandbox-cache/), /data/media (media/)
 ports:
   ui: 3000
   mcp: 3000 (/api/mcp)
-dependencies: none
+dependencies: ollama (optional; required only while Configure Local Inference names a model)
 startos_managed_env_vars:
   - NODE_ENV
   - DATABASE_URL
@@ -232,6 +269,7 @@ startos_managed_env_vars:
   - PERPLEXITY_API_KEY
   - GITHUB_TOKEN
   - BLOB_READ_WRITE_TOKEN
+  - CRM_MEDIA_DIR
 actions:
   - set-admin-credentials
   - configure-sign-in

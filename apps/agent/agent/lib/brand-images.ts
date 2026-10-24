@@ -1,5 +1,5 @@
 import type { Prisma } from "@crm/db";
-import { blobEnabled, mirror } from "@crm/db/blob";
+import { mirror, mirrorEnabled } from "@crm/db/blob";
 import { COMPANY_IMAGE_FIELDS } from "@crm/db/images";
 import { z } from "zod";
 
@@ -9,7 +9,7 @@ export async function mirrorBrandImages(
 	companyId: string,
 	update: Prisma.CompanyUpdateInput,
 ): Promise<{ update: Prisma.CompanyUpdateInput; mirrored: string[] }> {
-	if (!blobEnabled()) return { update, mirrored: [] };
+	if (!mirrorEnabled()) return { update, mirrored: [] };
 
 	const mirrored: string[] = [];
 

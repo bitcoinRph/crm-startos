@@ -1,5 +1,5 @@
 import { db } from "@crm/db";
-import { blobEnabled, isMirrored, mirror } from "@crm/db/blob";
+import { isMirrored, mirror, mirrorEnabled } from "@crm/db/blob";
 import { CONTEXT_DEV_PEOPLE, enabled } from "./capabilities";
 import { findPortrait, type PortraitSource } from "./portrait-sources";
 
@@ -38,12 +38,12 @@ export async function storePortrait({
 		};
 	}
 
-	if (!blobEnabled()) {
+	if (!mirrorEnabled()) {
 		return {
 			stored: false,
 			imageUrl: null,
 			reason:
-				"This install has no BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy. " +
+				"This install has no CRM_MEDIA_DIR or BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy. " +
 				"The source URL expires within weeks and is never stored. Retrying will not help.",
 		};
 	}
@@ -96,12 +96,12 @@ export async function runPortrait({
 	spend: (units?: number) => { ok: boolean; reason?: string };
 	force?: boolean;
 }): Promise<PortraitResult> {
-	if (!blobEnabled()) {
+	if (!mirrorEnabled()) {
 		return {
 			stored: false,
 			imageUrl: null,
 			reason:
-				"This install has no BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy. Retrying will not help.",
+				"This install has no CRM_MEDIA_DIR or BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy. Retrying will not help.",
 		};
 	}
 

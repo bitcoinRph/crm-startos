@@ -135,7 +135,7 @@ name only (`apps/api/src/api-keys/api-keys.contracts.ts:10`,
 | Vercel AI Gateway | Only in `LEGACY_GATEWAY` mode with a stored key. Off by default. OK. |
 | Model catalog `ai-gateway.vercel.sh/v1/models` | `GET /settings/model-catalog` still exists. The settings page hides the catalog in `LOCAL` mode. A direct call still egresses. Nice-to-have N4. |
 | Vercel Sandbox | Not used. just-bash in process. OK. |
-| Vercel Blob | `mirror()` returns null without a token. No filesystem backend. Follow-up (FOLLOWUPS.md). |
+| Vercel Blob | `CRM_MEDIA_DIR=/data/media` keeps pictures on the `main` volume; no Blob account needed. OK. |
 | Neon | No Neon code. PostgreSQL 17 sidecar. OK. |
 | Upstash / Redis | In-memory fallback. OK for one process. |
 | Vercel OIDC | Evals only. N/A. |
@@ -516,7 +516,7 @@ D7 exact verified version list. D4 (architecture) is still open; CI builds both.
 | Finding | Where | Status |
 | --- | --- | --- |
 | B1 Ollama unreachable | PR #8 `feat(startos)` commit | Done: optional `ollama` dependency, bridge address, model-ID-only action |
-| B2 no production extractor | PR #8 `feat(api)` and docs | Done: MCP path is the supported path; worker moved to `test/e2e`; unattended extraction in `FOLLOWUPS.md` E |
+| B2 no production extractor | PR #8 `feat(api)` and docs | Done: MCP path is the supported path; since PR #17 `apps/agent/agent/lib/sales-worker.ts` runs on the dispatch tick for the `crm-ollama` and `crm-codex` profiles |
 | B3 root chat in `LOCAL` | PR #8 `refactor(agent)` | Done: `LOCAL` denies every role; settings say so; `FOLLOWUPS.md` D |
 | B4 profile unreachable, framework-named | PR #11 | Done: `crm_integration`, `agent_propose`, `agent_read`; selector and table column |
 | S1 backup path | PR #10 | Done, separate PR |
@@ -535,7 +535,7 @@ D7 exact verified version list. D4 (architecture) is still open; CI builds both.
 | N1 non-root container | — | Not done: `FOLLOWUPS.md` G |
 | N2 Python turbo check | PR #8 `docs(crm)` | Done: replaced by `turbo-env.spec.ts` |
 | N3 empty commit | — | Squash-merge removes it |
-| N4 catalog egress in `LOCAL` | — | Not done: small, listed for the next PR |
+| N4 catalog egress in `LOCAL` | — | Done: `ModelCatalogService.models` returns an empty catalog in `LOCAL` without a network call |
 | N5 `EXPOSE` ports | — | Left alone |
 
 ## Issues

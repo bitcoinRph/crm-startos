@@ -24,7 +24,9 @@ type View = (typeof VIEWS)[number]["id"];
 export function AgentRunsDrawer({
 	activity,
 	cancelling,
+	deciding,
 	onCancel,
+	onDecide,
 	onOpenChange,
 	onRetry,
 	open,
@@ -34,7 +36,9 @@ export function AgentRunsDrawer({
 	activity: Activity;
 	agentId: string;
 	cancelling: boolean;
+	deciding: boolean;
 	onCancel: (runId: string) => void;
+	onDecide: (runId: string, decision: "APPROVE" | "REJECT") => void;
 	onOpenChange: (open: boolean) => void;
 	onRetry: (runId: string) => void;
 	open: boolean;
@@ -83,7 +87,9 @@ export function AgentRunsDrawer({
 					{view === "runs" ? (
 						<AgentRuns
 							cancelling={cancelling}
+							deciding={deciding}
 							onCancel={onCancel}
+							onDecide={onDecide}
 							onRetry={onRetry}
 							retryingRunId={retryingRunId}
 							runs={runs}

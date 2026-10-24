@@ -1,4 +1,5 @@
 import { schemas } from "@crm/validation";
+import { agentApprovalDecision } from "@crm/validation/agent-approval";
 import { z } from "zod";
 
 export const agentManifest = schemas.agents.capabilities.loose();
@@ -92,6 +93,18 @@ export const agentCancelRunInput = agentIdInput.extend({
 });
 
 export type AgentCancelRunInput = z.infer<typeof agentCancelRunInput>;
+
+export const agentDecideApprovalInput = agentIdInput.extend({
+	runId: z.string().min(1),
+	decision: agentApprovalDecision,
+});
+
+export type AgentDecideApprovalInput = z.infer<typeof agentDecideApprovalInput>;
+
+export const agentDecideApprovalOutput = z.object({
+	id: z.string(),
+	decision: agentApprovalDecision,
+});
 
 export const agentDeployInput = agentIdInput.extend({
 	versionId: z.string().min(1),
@@ -274,6 +287,13 @@ const agentRunActionOutput = z.object({
 	completedAt: z.string().nullable(),
 });
 
+const agentPendingApprovalOutput = z.object({
+	actionId: z.string(),
+	destination: z.string(),
+	text: z.string(),
+	canDecide: z.boolean(),
+});
+
 const agentRunSummaryOutput = z.object({
 	id: z.string(),
 	status: agentRunStatus,
@@ -293,6 +313,7 @@ const agentRunSummaryOutput = z.object({
 	totalEvents: z.number(),
 	eventsTruncated: z.boolean(),
 	canCancel: z.boolean(),
+	pendingApproval: agentPendingApprovalOutput.nullable(),
 	events: z.array(agentRunEventOutput),
 	actions: z.array(agentRunActionOutput),
 });

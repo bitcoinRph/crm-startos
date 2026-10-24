@@ -8,9 +8,11 @@ import {
 	type DataTableFacet,
 } from "@crm/ui/components/data-table";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
+import { ToggleGroup, ToggleGroupItem } from "@crm/ui/components/toggle-group";
 import { useTableSelection } from "@crm/ui/hooks/use-table-selection";
 import { formatMoney } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
+import { useQueryStates } from "nuqs";
 import { useEffect, useMemo } from "react";
 import { CLOSING_OPTIONS } from "@/components/crm/closing-window";
 import { CompanyCell } from "@/components/crm/company-cell";
@@ -21,15 +23,29 @@ import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { DealStageMenu } from "@/components/crm/stage-change";
 import { ListSearch } from "@/components/data-table/list-search";
+import { SavedViewsMenu } from "@/components/data-table/saved-views-menu";
 import { useTableQuery } from "@/components/data-table/use-table-query";
 import { LocalDay, LocalRelativeTime } from "@/components/local-date-time";
 import { DEAL_STAGE_OPTIONS } from "@/lib/deal-stage";
+import { SEARCH_PARAM } from "@/lib/search-param-keys";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { DealsBoard } from "./deals-board";
 import { DealsBulkActions } from "./deals-bulk-actions";
-import { dealsSearchParams } from "./deals-search-params";
+import {
+	DEALS_VIEWS,
+	type DealsView,
+	dealsBoardInput,
+	dealsSearchParams,
+	dealsViewParsers,
+} from "./deals-search-params";
 
 type DealRow = RouterOutputs["deals"]["list"]["rows"][number];
+
+const VIEW_LABELS = {
+	table: "Table",
+	board: "Board",
+} satisfies Record<DealsView, string>;
 
 const COLUMNS: DataTableColumn<DealRow>[] = [
 	{
@@ -148,10 +164,13 @@ export function DealsTable() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
 	const prefetchRecord = usePrefetchRecord();
-	const { query, input, setArchived } = useTableQuery(dealsSearchParams);
+	const table = useTableQuery(dealsSearchParams);
+	const { query, input, setArchived } = table;
+	const [viewValues, setViewValues] = useQueryStates(dealsViewParsers);
+	const board = viewValues[SEARCH_PARAM.list.view] === "board";
 
 	const deals = useQuery({
-		...trpc.deals.list.queryOptions(input),
+		...trpc.deals.list.queryOptions(board ? dealsBoardInput(input) : input),
 		placeholderData: (previous) => previous,
 	});
 	const users = useQuery(trpc.users.list.queryOptions());
@@ -232,29 +251,60 @@ export function DealsTable() {
 			query={query}
 			search={<ListSearch placeholder="Search deals by name or company…" />}
 			actions={
-				<Button
-					variant={input.archived ? "contrast" : "outline"}
-					size="sm"
-					className="justify-start sm:justify-center"
-					onClick={() => toggleArchived(!input.archived)}
-				>
-					<Archive data-icon="inline-start" />
-					Archived
-				</Button>
+				<>
+					<ToggleGroup
+						type="single"
+						variant="outline"
+						size="sm"
+						spacing={0}
+						value={board ? "board" : "table"}
+						onValueChange={(next) => {
+							const view = DEALS_VIEWS.find((option) => option === next);
+							if (view) void setViewValues({ [SEARCH_PARAM.list.view]: view });
+						}}
+					>
+						{DEALS_VIEWS.map((option) => (
+							<ToggleGroupItem key={option} value={option}>
+								{VIEW_LABELS[option]}
+							</ToggleGroupItem>
+						))}
+					</ToggleGroup>
+					{board ? null : <SavedViewsMenu entity="DEAL" table={table} />}
+					{board ? null : (
+						<Button
+							variant={input.archived ? "contrast" : "outline"}
+							size="sm"
+							className="justify-start sm:justify-center"
+							onClick={() => toggleArchived(!input.archived)}
+						>
+							<Archive data-icon="inline-start" />
+							Archived
+						</Button>
+					)}
+				</>
+			}
+			body={
+				board ? (
+					<DealsBoard rows={rows} total={deals.data?.total ?? 0} />
+				) : undefined
 			}
 			columns={columns}
 			rows={rows}
 			total={deals.data?.total ?? 0}
 			facetCounts={facetCounts}
 			facets={facets}
-			tabs={{
-				id: "status",
-				allLabel: "All deals",
-				options: [
-					{ value: "open", label: "Open" },
-					{ value: "closed", label: "Closed" },
-				],
-			}}
+			tabs={
+				board
+					? undefined
+					: {
+							id: "status",
+							allLabel: "All deals",
+							options: [
+								{ value: "open", label: "Open" },
+								{ value: "closed", label: "Closed" },
+							],
+						}
+			}
 			selection={{
 				state: selection,
 				actions: (

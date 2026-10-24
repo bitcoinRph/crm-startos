@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { ExportCsvButton } from "@/components/crm/export-csv-button";
+import { ImportCsvDialog } from "@/components/crm/import-csv-dialog";
 import {
 	PageShell,
 	PageShellActions,
@@ -14,7 +16,11 @@ import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { CreateDealSheet } from "./create-deal-sheet";
-import { dealsSearchParams } from "./deals-search-params";
+import {
+	dealsBoardInput,
+	dealsSearchParams,
+	dealsViewLoader,
+} from "./deals-search-params";
 import { DealsTable } from "./deals-table";
 
 export const metadata: Metadata = {
@@ -34,6 +40,8 @@ export default function DealsPage({
 					</PageShellDescription>
 				</PageShellHeading>
 				<PageShellActions>
+					<ImportCsvDialog entity="deals" />
+					<ExportCsvButton entity="deals" />
 					<CreateDealSheet />
 				</PageShellActions>
 			</PageShellHeader>
@@ -50,16 +58,20 @@ export default function DealsPage({
 async function Deals({
 	searchParams,
 }: Pick<PageProps<"/[slug]/deals">, "searchParams">) {
-	const [, values] = await Promise.all([
+	const [, values, { view }] = await Promise.all([
 		requireSession(),
 		dealsSearchParams.load(searchParams),
+		dealsViewLoader(searchParams),
 	]);
+	const input = dealsSearchParams.toInput(values);
 
 	const trpc = getServerTrpc();
 	const queryClient = getServerQueryClient();
 	await Promise.all([
 		queryClient.prefetchQuery(
-			trpc.deals.list.queryOptions(dealsSearchParams.toInput(values)),
+			trpc.deals.list.queryOptions(
+				view === "board" ? dealsBoardInput(input) : input,
+			),
 		),
 		queryClient.prefetchQuery(trpc.users.list.queryOptions()),
 		queryClient.prefetchQuery(trpc.companies.options.queryOptions({ q: "" })),

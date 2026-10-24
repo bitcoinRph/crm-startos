@@ -11,7 +11,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { setImmediate } from "node:timers/promises";
-import { auth } from "@crm/auth";
+import { API_KEY_RATE_LIMIT, auth } from "@crm/auth";
 import { db } from "@crm/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -25,6 +25,7 @@ import { z } from "zod";
 import { activityEntryOutput } from "../src/activities/activities.contracts";
 import { ActivitiesService } from "../src/activities/activities.service";
 import * as localDay from "../src/activities/local-day";
+import { ApiKeyAuditService } from "../src/api-keys/api-key-audit.service";
 import {
 	type ApiKeyProfile,
 	KEY_PERMISSIONS,
@@ -74,6 +75,7 @@ let readerKey: Awaited<
 >;
 let sessionSpy: ReturnType<typeof spyOn<typeof auth.api, "getSession">>;
 let verifySpy: ReturnType<typeof spyOn<typeof auth.api, "verifyApiKey">>;
+let auditSpy: ReturnType<typeof spyOn<ApiKeyAuditService, "record">>;
 const clients: Client[] = [];
 const extraUserIds: string[] = [];
 
@@ -144,6 +146,9 @@ beforeEach(async () => {
 	verifySpy = spyOn(auth.api, "verifyApiKey").mockImplementation(
 		fixture.api.verifyApiKey,
 	);
+	auditSpy = spyOn(ApiKeyAuditService.prototype, "record").mockImplementation(
+		() => undefined,
+	);
 	await db.user.create({
 		data: { id: userId, name: "MCP fixture", email: `${prefix}@example.com` },
 	});
@@ -169,9 +174,11 @@ afterEach(async () => {
 	for (const client of clients.splice(0)) await client.close();
 	sessionSpy?.mockRestore();
 	verifySpy?.mockRestore();
+	auditSpy?.mockRestore();
 	await db.activity.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.deal.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.contact.deleteMany({ where: { id: { startsWith: prefix } } });
+	await db.contact.deleteMany({ where: { email: `lead@${prefix}.test` } });
 	await db.company.deleteMany({ where: { id: { startsWith: prefix } } });
 	if (userId)
 		await db.user.deleteMany({
@@ -184,6 +191,39 @@ afterAll(async () => {
 });
 
 describe("MCP contract", () => {
+	it("refuses a rate-limited key with HTTP 429 and keeps other keys working", async () => {
+		const limited = await createKey("agent_read");
+		for (let used = 0; used < API_KEY_RATE_LIMIT.maxRequests; used++) {
+			const verified = await fixture.api.verifyApiKey({
+				body: { key: limited.key },
+			});
+			expect(verified.valid).toBe(true);
+		}
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-api-key": limited.key,
+			},
+			body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+		});
+		expect(response.status).toBe(429);
+		expect(
+			z.object({ error: z.string() }).parse(await response.json()).error,
+		).toContain("rate limit");
+		const trpc = await fetch(new URL("/api/trpc/contacts.list", endpoint), {
+			headers: { "x-api-key": limited.key },
+		});
+		expect(trpc.status).toBe(429);
+		const rest = await fetch(
+			new URL("/rest/search/resolve-customer?email=a@b.test", endpoint),
+			{ headers: { authorization: `Bearer ${limited.key}` } },
+		);
+		expect(rest.status).toBe(429);
+		const tools = await reader.listTools();
+		expect(tools.tools.length).toBeGreaterThan(0);
+	});
+
 	it("drains rejected POST bytes without parsing JSON-RPC", async () => {
 		let drained: boolean | undefined;
 		const observe = (request: IncomingMessage, response: ServerResponse) => {
@@ -448,6 +488,28 @@ describe("MCP contract", () => {
 		).toEqual(before);
 	});
 
+	it("records an MCP call and a refused MCP call against the key", async () => {
+		await call(reader, { name: "get_company", arguments: { id: companyId } });
+		await call(reader, {
+			name: "update_contact",
+			arguments: { id: contactId, data: { firstName: "Forbidden change" } },
+		});
+		expect(auditSpy.mock.calls.map(([entry]) => entry)).toEqual([
+			{
+				keyId: readerKey.id,
+				procedure: "companies.byId",
+				type: "query",
+				outcome: "allowed",
+			},
+			{
+				keyId: readerKey.id,
+				procedure: "contacts.update",
+				type: "mutation",
+				outcome: "denied",
+			},
+		]);
+	});
+
 	it("M4 never exposes key management or Codex procedures", () => {
 		expect(
 			MCP_TOOLS.some((tool) => /^(apiKeys|codex)\./.test(tool.procedure)),
@@ -487,6 +549,111 @@ describe("MCP contract", () => {
 			}),
 		});
 		expect(response.status).toBe(401);
+	});
+
+	it("E1 exports active records as CSV for a read-only key and leaves the rows alone", async () => {
+		await db.company.create({
+			data: {
+				id: `${prefix}-archived-company`,
+				name: `${prefix} archived`,
+				domain: `archived-${prefix}.test`,
+				archivedAt: new Date(),
+			},
+		});
+		const exported = z.object({
+			entity: z.string(),
+			filename: z.string(),
+			csv: z.string(),
+			rows: z.number(),
+			truncated: z.boolean(),
+		});
+		const before = await ownedState();
+		const companies = await read(
+			"export_csv",
+			{ entity: "companies" },
+			exported,
+		);
+		expect(companies.filename).toBe("companies.csv");
+		expect(companies.truncated).toBe(false);
+		expect(companies.csv).toContain(companyId);
+		expect(companies.csv).toContain(`${prefix}.test`);
+		expect(companies.csv).not.toContain(`archived-${prefix}.test`);
+		const contacts = await read("export_csv", { entity: "contacts" }, exported);
+		expect(contacts.csv).toContain(`active@${prefix}.test`);
+		const deals = await read("export_csv", { entity: "deals" }, exported);
+		expect(deals.csv).toContain(dealId);
+		expect(deals.csv).toContain(`${prefix} active`);
+		expect(await ownedState()).toEqual(before);
+		const invalid = await call(reader, {
+			name: "export_csv",
+			arguments: { entity: "users" },
+		});
+		expect(invalid.isError).toBe(true);
+	});
+});
+
+describe("CSV import over REST", () => {
+	const post = (key: string, dryRun: boolean) =>
+		fetch(new URL("/rest/csv/import", endpoint), {
+			method: "POST",
+			headers: { "x-api-key": key, "content-type": "application/json" },
+			body: JSON.stringify({
+				entity: "companies",
+				csv: `name,domain\r\nImported,imported-${prefix}.test\r\n`,
+				dryRun,
+			}),
+		});
+
+	afterEach(async () => {
+		const imported = await db.company.findMany({
+			where: { domain: `imported-${prefix}.test` },
+			select: { id: true },
+		});
+		const ids = imported.map((company) => company.id);
+		await db.agentTask.deleteMany({ where: { companyId: { in: ids } } });
+		await db.company.deleteMany({ where: { id: { in: ids } } });
+	});
+
+	it("I1 keeps import out of MCP and denies it to every agent profile", async () => {
+		expect(MCP_TOOLS.some((tool) => tool.procedure === "csv.import")).toBe(
+			false,
+		);
+		for (const profile of ["agent_read", "agent_propose"] as const) {
+			const key = await createKey(profile);
+			const response = await post(key.key, false);
+			expect(response.status).toBe(403);
+		}
+		expect(
+			await db.company.count({ where: { domain: `imported-${prefix}.test` } }),
+		).toBe(0);
+	});
+
+	it("I2 lets an integration key check a file, then import it", async () => {
+		const key = await createKey("crm_integration");
+		const report = z.object({
+			dryRun: z.boolean(),
+			create: z.number(),
+			errors: z.array(z.unknown()),
+		});
+
+		const dry = await post(key.key, true);
+		expect(dry.status).toBe(200);
+		expect(report.parse(await dry.json())).toMatchObject({
+			dryRun: true,
+			create: 1,
+			errors: [],
+		});
+		expect(
+			await db.company.count({ where: { domain: `imported-${prefix}.test` } }),
+		).toBe(0);
+
+		const applied = await post(key.key, false);
+		expect(applied.status).toBe(200);
+		expect(report.parse(await applied.json()).create).toBe(1);
+		const stored = await db.company.findFirstOrThrow({
+			where: { domain: `imported-${prefix}.test` },
+		});
+		expect(stored.source).toBe("IMPORT");
 	});
 });
 
@@ -595,18 +762,29 @@ const profileTools = {
 		...existingProfileTools.crm_integration,
 		"resolve_customer",
 		"follow_ups",
+		"intake_submit",
+		"export_csv",
 	],
 	agent_propose: [
 		...existingProfileTools.agent_propose,
 		"resolve_customer",
 		"follow_ups",
+		"export_csv",
 	],
 	agent_read: [
 		...existingProfileTools.agent_read,
 		"resolve_customer",
 		"follow_ups",
+		"export_csv",
 	],
-	legacy: [...existingProfileTools.legacy, "resolve_customer", "follow_ups"],
+	legacy: [
+		...existingProfileTools.legacy,
+		"resolve_customer",
+		"follow_ups",
+		"intake_submit",
+		"export_csv",
+	],
+	intake: ["intake_submit"],
 } as const;
 
 async function ownedState() {
@@ -656,6 +834,7 @@ describe("MCP profile discovery", () => {
 			"crm_integration",
 			"agent_propose",
 			"agent_read",
+			"intake",
 			"legacy",
 		] as const) {
 			const key = await createKey(profile === "legacy" ? undefined : profile);
@@ -722,6 +901,24 @@ describe("MCP profile discovery", () => {
 			["attach_contact_to_deal", { dealId, contactId }],
 			["log_activity", { type: "NOTE", body: "synthetic", contactId }],
 			["complete_task", { id: `${prefix}-task`, completed: true }],
+			["intake_submit", { email: `denied@${prefix}.test` }],
+			["search_crm", { q: prefix }],
+			["resolve_customer", { domain: `${prefix}.test` }],
+			["whoami", {}],
+			["list_users", {}],
+			["get_workspace", {}],
+			["dashboard_summary", {}],
+			["list_contacts", {}],
+			["get_contact", { id: contactId }],
+			["list_companies", {}],
+			["get_company", { id: companyId }],
+			["list_deals", {}],
+			["get_deal", { id: dealId }],
+			["timeline", { contactId }],
+			["my_tasks", {}],
+			["follow_ups", { timeZone: "UTC", days: 1 }],
+			["list_fields", { entity: "CONTACT" }],
+			["export_csv", { entity: "companies" }],
 		]);
 		await db.activity.create({
 			data: {
@@ -735,6 +932,7 @@ describe("MCP profile discovery", () => {
 		for (const profile of [
 			"agent_read",
 			"crm_integration",
+			"intake",
 			"legacy",
 		] as const) {
 			const key = await createKey(profile === "legacy" ? undefined : profile);
@@ -762,6 +960,57 @@ describe("MCP profile discovery", () => {
 				expect(await ownedState()).toEqual(before);
 			}
 		}
+	});
+
+	it("an intake key files a lead through intake_submit", async () => {
+		const key = await createKey("intake");
+		const client = await connect({ authorization: `Bearer ${key.key}` });
+		const email = `Lead@${prefix}.test`;
+		const result = await call(client, {
+			name: "intake_submit",
+			arguments: { email, firstName: `${prefix} lead`, source: "mcp-test" },
+		});
+		expect(result.isError).not.toBe(true);
+		const filed = z
+			.object({
+				status: z.literal("accepted"),
+				contactId: z.string(),
+				created: z.literal(true),
+			})
+			.parse(JSON.parse(z.string().parse(result.content[0]?.text)));
+		const contact = await db.contact.findUnique({
+			where: { id: filed.contactId },
+			select: { email: true, source: true },
+		});
+		expect(contact).toEqual({ email: email.toLowerCase(), source: "INTAKE" });
+		const denied = await call(client, {
+			name: "get_contact",
+			arguments: { id: filed.contactId },
+		});
+		expect(denied.content[0]?.text).toStartWith("FORBIDDEN:");
+		const http = (path: string, body: Record<string, string>) =>
+			fetch(new URL(`/api/trpc/${path}`, endpoint), {
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${key.key}`,
+					"content-type": "application/json",
+				},
+				body: JSON.stringify(body),
+			});
+		const second = await http("intake.submit", { email });
+		expect(second.status).toBe(200);
+		expect(
+			z
+				.object({
+					result: z.object({
+						data: z.object({ created: z.literal(false) }),
+					}),
+				})
+				.safeParse(await second.json()).success,
+		).toBe(true);
+		const other = await http("contacts.create", { firstName: "Denied" });
+		expect(other.status).toBe(403);
+		await db.agentTask.deleteMany({ where: { contactId: filed.contactId } });
 	});
 
 	it("P3 lists every tool for a cookie session", async () => {

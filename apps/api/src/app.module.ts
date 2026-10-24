@@ -15,6 +15,7 @@ import { validateEnv } from "./config/env.validation";
 import { ContactsModule } from "./contacts/contacts.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { CrmModule } from "./crm/crm.module";
+import { CsvModule } from "./csv/csv.module";
 import { CurrencyModule } from "./currency/currency.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { DatabaseModule } from "./database/database.module";
@@ -23,6 +24,7 @@ import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { FieldsModule } from "./fields/fields.module";
 import { GoogleModule } from "./google/google.module";
 import { HealthModule } from "./health/health.module";
+import { IntakeModule } from "./intake/intake.module";
 import { LoggingModule } from "./logging/logging.module";
 import { logAuthRoute } from "./logging/request-logger.middleware";
 import { MailboxModule } from "./mailbox/mailbox.module";
@@ -61,6 +63,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		CompaniesModule,
 		ContactsModule,
 		ConversationsModule,
+		CsvModule,
 		CurrencyModule,
 		DealsModule,
 		FieldsModule,
@@ -82,6 +85,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		TrackingModule,
 		ArchiveModule,
 		SavedViewsModule,
+		IntakeModule,
 		SalesModule,
 	],
 })

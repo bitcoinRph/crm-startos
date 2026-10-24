@@ -3,6 +3,11 @@ import { type Db, Prisma } from "@crm/db";
 import type { AgentRunStatus } from "@crm/db/enums";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import {
+	AGENT_APPROVAL_STATES,
+	readActionApproval,
+} from "@crm/validation/agent-approval";
+import { AGENT_ACTION_TYPES } from "@crm/validation/agent-manifest";
+import {
 	BadRequestException,
 	ConflictException,
 	ForbiddenException,
@@ -15,6 +20,7 @@ import { AGENT_DISPATCH } from "./agent-dispatch.config";
 import { AgentTriggerService } from "./agent-trigger.service";
 import type {
 	AgentCancelRunInput,
+	AgentDecideApprovalInput,
 	AgentRetryRunInput,
 	AgentRunNowInput,
 } from "./agents.contracts";
@@ -85,6 +91,7 @@ export class AgentRunsService {
 						attemptCount: true,
 						errorCode: true,
 						errorMessage: true,
+						metadata: true,
 						plannedAt: true,
 						startedAt: true,
 						completedAt: true,
@@ -93,28 +100,30 @@ export class AgentRunsService {
 			},
 		});
 
-		return rows.map(({ _count, ...run }) => ({
-			...run,
-			totalEvents: _count.events,
-			eventsTruncated: _count.events > run.events.length,
-			canCancel:
-				CANCELLABLE_STATUSES.includes(run.status) &&
-				(agent.canManage || run.initiatedBy?.id === userId),
-			costUsd: run.costUsd?.toString() ?? null,
-			createdAt: run.createdAt.toISOString(),
-			startedAt: run.startedAt?.toISOString() ?? null,
-			finishedAt: run.finishedAt?.toISOString() ?? null,
-			events: run.events.map((event) => ({
-				...event,
-				emittedAt: event.emittedAt.toISOString(),
-			})),
-			actions: run.actions.map((action) => ({
-				...action,
-				plannedAt: action.plannedAt.toISOString(),
-				startedAt: action.startedAt?.toISOString() ?? null,
-				completedAt: action.completedAt?.toISOString() ?? null,
-			})),
-		}));
+		return rows.map(({ _count, ...run }) => {
+			const mayControl = agent.canManage || run.initiatedBy?.id === userId;
+			return {
+				...run,
+				totalEvents: _count.events,
+				eventsTruncated: _count.events > run.events.length,
+				canCancel: CANCELLABLE_STATUSES.includes(run.status) && mayControl,
+				pendingApproval: pendingApproval(run.status, run.actions, mayControl),
+				costUsd: run.costUsd?.toString() ?? null,
+				createdAt: run.createdAt.toISOString(),
+				startedAt: run.startedAt?.toISOString() ?? null,
+				finishedAt: run.finishedAt?.toISOString() ?? null,
+				events: run.events.map((event) => ({
+					...event,
+					emittedAt: event.emittedAt.toISOString(),
+				})),
+				actions: run.actions.map(({ metadata: _metadata, ...action }) => ({
+					...action,
+					plannedAt: action.plannedAt.toISOString(),
+					startedAt: action.startedAt?.toISOString() ?? null,
+					completedAt: action.completedAt?.toISOString() ?? null,
+				})),
+			};
+		});
 	}
 
 	async activity(agentId: string, limit: number, userId: string) {
@@ -430,6 +439,106 @@ export class AgentRunsService {
 		return outcome;
 	}
 
+	async decideApproval(input: AgentDecideApprovalInput, userId: string) {
+		const agent = await this.readableAgent(input.id, userId);
+		const decided =
+			input.decision === "APPROVE"
+				? AGENT_APPROVAL_STATES.APPROVED
+				: AGENT_APPROVAL_STATES.REJECTED;
+
+		await this.db.$transaction(async (tx) => {
+			const [run] = await tx.$queryRaw<
+				Array<{
+					id: string;
+					agentId: string;
+					versionId: string;
+					status: AgentRunStatus;
+					initiatedById: string | null;
+				}>
+			>`
+				SELECT id, "agentId", "versionId", status, "initiatedById"
+				FROM "agentRun"
+				WHERE id = ${input.runId}
+				FOR UPDATE
+			`;
+
+			if (!run || run.agentId !== input.id) {
+				throw new NotFoundException(`No run with id ${input.runId}.`);
+			}
+
+			if (!agent.canManage && run.initiatedById !== userId) {
+				throw new ForbiddenException(
+					"Only the person who started this run, or a workspace admin, can decide it.",
+				);
+			}
+
+			if (run.status !== "WAITING_FOR_APPROVAL") {
+				throw new ConflictException("This run is not waiting for approval.");
+			}
+
+			const action = await tx.agentAction.findFirst({
+				where: {
+					runId: run.id,
+					type: AGENT_ACTION_TYPES.SLACK_MESSAGE_POST,
+					status: "PLANNED",
+				},
+				orderBy: { plannedAt: "asc" },
+				select: { id: true, metadata: true },
+			});
+			const request = action ? readActionApproval(action.metadata) : null;
+			if (!action || !request) {
+				throw new ConflictException("This run is not waiting for approval.");
+			}
+
+			if (request.approval.state !== AGENT_APPROVAL_STATES.PENDING) {
+				if (request.approval.state === decided) return;
+				throw new ConflictException("This approval has already been decided.");
+			}
+
+			await tx.agentAction.update({
+				where: { id: action.id },
+				data: {
+					metadata: {
+						...request,
+						approval: {
+							...request.approval,
+							state: decided,
+							decidedById: userId,
+							decidedAt: new Date().toISOString(),
+						},
+					},
+				},
+			});
+
+			await tx.agentAuditEvent.upsert({
+				where: {
+					agentId_type_requestId: {
+						agentId: run.agentId,
+						type: `run.approval.${input.decision === "APPROVE" ? "approved" : "rejected"}`,
+						requestId: run.id,
+					},
+				},
+				create: {
+					agentId: run.agentId,
+					versionId: run.versionId,
+					actorUserId: userId,
+					actorType: "USER",
+					actorId: userId,
+					type: `run.approval.${input.decision === "APPROVE" ? "approved" : "rejected"}`,
+					summary:
+						input.decision === "APPROVE"
+							? "Approved a Slack post"
+							: "Rejected a Slack post",
+					requestId: run.id,
+				},
+				update: {},
+			});
+		});
+
+		this.trigger.deployedAgentRunQueued();
+		return { id: input.runId, decision: input.decision };
+	}
+
 	private async readableAgent(agentId: string, userId: string) {
 		return this.access.assertCanRead(agentId, userId);
 	}
@@ -442,4 +551,31 @@ export class AgentRunsService {
 			throw new BadRequestException("That run request has already been used.");
 		}
 	}
+}
+
+function pendingApproval(
+	status: AgentRunStatus,
+	actions: Array<{
+		id: string;
+		status: string;
+		targetLabel: string | null;
+		metadata: Prisma.JsonValue;
+	}>,
+	canDecide: boolean,
+) {
+	if (status !== "WAITING_FOR_APPROVAL") return null;
+
+	for (const action of actions) {
+		const request =
+			action.status === "PLANNED" ? readActionApproval(action.metadata) : null;
+		if (request?.approval.state === AGENT_APPROVAL_STATES.PENDING) {
+			return {
+				actionId: action.id,
+				destination: action.targetLabel ?? "Slack",
+				text: request.approval.text,
+				canDecide,
+			};
+		}
+	}
+	return null;
 }

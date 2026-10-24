@@ -16,6 +16,12 @@ export const API_KEY_PROFILE_OPTIONS = [
 		label: "Agent: read only",
 		description: "Reads the CRM. Changes nothing.",
 	},
+	{
+		value: "intake",
+		label: "Intake: create leads only",
+		description:
+			"Files a lead from a form or automation. Reads and changes nothing else.",
+	},
 ] as const;
 
 export type ApiKeyProfileValue =

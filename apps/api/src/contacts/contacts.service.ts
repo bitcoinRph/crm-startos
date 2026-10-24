@@ -262,7 +262,10 @@ export class ContactsService {
 		};
 	}
 
-	async create(input: ContactCreateInput) {
+	async create(
+		input: ContactCreateInput,
+		options: { source?: RecordSource } = {},
+	) {
 		const email = normalizeEmail(input.email ?? "");
 
 		if (email) {
@@ -300,6 +303,7 @@ export class ContactsService {
 					title: blankToNull(input.title ?? ""),
 					companyId,
 					ownerId: input.ownerId ?? null,
+					source: options.source,
 				},
 				select: {
 					id: true,

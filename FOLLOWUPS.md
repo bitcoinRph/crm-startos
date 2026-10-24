@@ -35,15 +35,6 @@ Sales tools require every scope that their router enforces. Legacy keys see no s
 Cookie sessions see every allow-listed tool. Hidden calls still pass through server authorization.
 Verification: bridge tests cover all profiles, legacy keys, cookie sessions, and every hidden reader or legacy call.
 
-### Audit log per key
-
-- `Apikey.lastRequest` is the only trace today. Add an `ApiKeyCall` table:
-  `keyId`, `procedure`, `type`, `outcome` (`allowed`, `denied`), `createdAt`,
-  written by `AuthMiddleware` after the decision, batched or fire-and-forget.
-- Show the last 50 calls per key in Settings → API keys.
-- Retention: prune with the archive cron at `archiveRetentionDays`.
-- Never log arguments: they carry customer text.
-
 ## B. Codex in the CRM
 
 Implemented in this branch; `docs/codex.md` is the reference. What is left:
@@ -88,14 +79,14 @@ retry policy (a failed request stays `FAILED` and the agent files a new one).
 
 ## F. Pictures on a StartOS volume
 
-`packages/db/src/blob.ts` mirrors to Vercel Blob only. Add a filesystem backend
-that writes under the `main` volume and serves through the app, keyed by the
-same content hash. `isOptimizable` then allow-lists the CRM's own origin.
+Implemented: `CRM_MEDIA_DIR` makes `mirror()` write under the `main` volume
+(`media/` on StartOS) and the app serves `/media/<name>`. What is left: an
+install test on a real StartOS box, and a size cap on the directory.
 
 ## G. Container hardening
 
-The image runs as root (`Dockerfile`). Add `USER node` and give the mounted
-volume paths to that user in `main.ts`.
+Done: the image now ends with `USER node`, and `main.ts` runs every `crm` process
+as `node` after a root `crm-volume-owner` oneshot chowns the mounted volume paths.
 
 ## H. Dead-code gate
 

@@ -14,6 +14,8 @@ Password sign-in is on, so nothing outside your network is needed to get in. Goo
 
 ## Getting set up
 
+Package 1.20.0:0 runs the CRM as a non-root user, keeps pictures on the service volume, and adds saved views, a deal board, a weighted forecast, CSV export and import, lead intake and Slack post approval. Back up before you update. Downloading a package does not update an installed service.
+
 1. Run **Set Sign-in Credentials**. Enter the email address you will use and leave the password empty to generate one. Copy both; the password is shown once.
 2. Start the service and open the **Web UI** interface. Sign in with the email and password from step 1. The first account to sign in owns the workspace.
 3. Complete the onboarding: name the workspace and enter your website. Research integrations remain optional and can be configured later.
@@ -82,7 +84,7 @@ You can connect an OpenAI API key instead; it is billed per token on your OpenAI
 
 - **Set Sign-in Credentials** — create or reset the password account. Takes effect on the next start.
 - **Configure Sign-in** — the allow-list, the public URL, and Google or Microsoft sign-in.
-- **Configure Research Agent** — explicit legacy Gateway mode and optional Perplexity, GitHub and Vercel Blob keys, plus telemetry.
+- **Configure Research Agent** — explicit legacy Gateway mode and optional Perplexity, GitHub and Vercel Blob keys, plus telemetry. Contact photos and logos are kept on your server and included in backups, so the Vercel Blob key is not needed.
 - **Configure Local Inference** — the model ID pulled in the Ollama service and the output token cap. Leave the model ID empty to turn local inference off. While a model is set, the Ollama service is a required dependency and the CRM does not start without it.
 
 ## Limitations

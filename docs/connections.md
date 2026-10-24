@@ -60,6 +60,15 @@ sign in on different paths and never reach the guard.
 A workspace with no owner and no admin lets any member connect. There is nobody
 left to ask, and a fresh install must not be locked out of its first connection.
 
+## The intake endpoint is a key and a URL, not a connection
+
+`/settings/connections/intake` describes one thing, so it is flat sections, not cards.
+It sends no data out and holds no credential of its own. It tells the rep to create an
+API key with the Intake profile in Settings → API keys, then shows a curl call to
+`<origin>/api/trpc/intake.submit` built on the server from the request's own host. The
+key reaches `intake.submit` only (`docs/api.md`), so it cannot read the CRM. Do not add a
+second token store or a public unauthenticated form endpoint here.
+
 ## Direction is the organising idea
 
 Every connection declares what it **brings in** and what it **sends**. Use those

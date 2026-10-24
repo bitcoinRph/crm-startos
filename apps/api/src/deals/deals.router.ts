@@ -8,6 +8,7 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { AgentAccessService } from "../agent/agent-access.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
@@ -39,7 +40,10 @@ import { DealsService } from "./deals.service";
 @Router({ alias: "deals" })
 @UseMiddlewares(AuthMiddleware)
 export class DealsRouter {
-	constructor(@Inject(DealsService) private readonly deals: DealsService) {}
+	constructor(
+		@Inject(DealsService) private readonly deals: DealsService,
+		@Inject(AgentAccessService) private readonly access: AgentAccessService,
+	) {}
 
 	@Query({
 		input: dealListInput,
@@ -100,7 +104,8 @@ export class DealsRouter {
 		output: dealMutateOutput,
 		meta: restMeta("DELETE", "/deals/{id}", ["Deals"]),
 	})
-	async purge(@Input("id") id: string) {
+	async purge(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.deals.purge(id);
 	}
 
@@ -198,7 +203,8 @@ export class DealsRouter {
 		output: dealBulkResultOutput,
 		meta: restMeta("POST", "/deals/bulk-purge", ["Deals"]),
 	})
-	async bulkPurge(@Input("ids") ids: string[]) {
+	async bulkPurge(@Ctx() ctx: AuthedTrpcContext, @Input("ids") ids: string[]) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.deals.bulkPurge(ids);
 	}
 }

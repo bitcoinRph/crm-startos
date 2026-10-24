@@ -70,6 +70,10 @@ export class EnvironmentVariables {
 
 	@IsOptional()
 	@IsString()
+	CRM_INFERENCE_MODE?: string;
+
+	@IsOptional()
+	@IsString()
 	SLACK_CLIENT_ID?: string;
 
 	@IsOptional()
@@ -112,6 +116,10 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	BLOB_READ_WRITE_TOKEN?: string;
+
+	@IsOptional()
+	@IsString()
+	CRM_MEDIA_DIR?: string;
 
 	@IsOptional()
 	@IsUrl(

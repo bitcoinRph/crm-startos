@@ -41,6 +41,19 @@ export const createApiKeyOutput = apiKeySummaryOutput.extend({
 	key: z.string(),
 });
 
+export const apiKeyCallsInput = z.object({
+	id: z.string().trim().min(1),
+});
+
+export const apiKeyCallsOutput = z.array(
+	z.object({
+		procedure: z.string(),
+		type: z.string(),
+		outcome: z.enum(["allowed", "denied"]),
+		createdAt: z.string(),
+	}),
+);
+
 export const revokeApiKeyOutput = z.object({ id: z.string() });
 
 export type ApiKeyListInput = z.infer<typeof apiKeyListInput>;

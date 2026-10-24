@@ -22,6 +22,7 @@ const REASONS: RunFailureReasons = {
 	AGENT_UNAVAILABLE: "The agent was paused or archived when this run started.",
 	AGENT_DELETED: "The agent was deleted before this run finished.",
 	CANCELLED_BY_USER: "Someone stopped this run.",
+	APPROVAL_REJECTED: "A person rejected the Slack post. Nothing was sent.",
 	RUN_TIMED_OUT:
 		"This run took too long and was stopped so later runs could start.",
 };

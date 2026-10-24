@@ -143,7 +143,7 @@ describe("API keys and Codex", () => {
 			])
 				expect(
 					authorizeApiKeyProcedure(
-						{ referenceId: "u", permissions },
+						{ id: "key-1", referenceId: "u", permissions },
 						path,
 						type,
 					),

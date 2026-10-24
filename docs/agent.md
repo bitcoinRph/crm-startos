@@ -29,17 +29,24 @@ See `docs/local-inference.md` for the complete mode and session contract.
 
 ## Pictures are copied, never linked
 
-`mirror()` copies bytes to Vercel Blob; the record points at our copy. Lives in
+`mirror()` copies bytes to Vercel Blob, or to `CRM_MEDIA_DIR` when that is set; the
+record points at our copy. Lives in
 **`@crm/db/blob`** — writers are `lib/brand-images.ts`, `lib/portrait.ts`,
 `FaviconService`, `ImageMirrorService`, `prisma/seed.ts`.
 
 - **The key hashes the bytes** — idempotent, and a redesigned mark gets a new URL.
 - **`COMPANY_IMAGE_FIELDS` (`@crm/db/images`) is the one list of picture columns.**
 - **Fetch through `@crm/db/safe-fetch`** — vendor URLs are SSRF vectors.
-- **No `BLOB_READ_WRITE_TOKEN` means no photographs**; logos keep the origin URL.
+- **No `BLOB_READ_WRITE_TOKEN` and no `CRM_MEDIA_DIR` means no photographs**; logos
+  keep the origin URL.
+- **`CRM_MEDIA_DIR` wins over Blob.** The file is `<prefix with / as ->-<digest>.<ext>`,
+  written to a temporary name and renamed, and the record stores the relative path
+  `/media/<name>`, so it survives a change of address. `apps/app/app/media/[name]/route.ts`
+  serves only names matching `MEDIA_NAME` (`@crm/db/images`). It needs no session: the
+  image optimizer fetches it without cookies, and a Blob URL is public too.
 - **`isOptimizable` (`@crm/db/images`) is the whole rule**: `next.config.ts`
-  allow-lists only our Blob host (a wildcard makes us an open image proxy), and a
-  mirrored **SVG is still refused**.
+  allow-lists only our Blob host (a wildcard makes us an open image proxy), our own
+  `/media/` path is local and needs no entry, and a mirrored **SVG is still refused**.
 - **Faces are not optimized** — `AvatarImage` skips `<Image>` because Radix probes the
   URL itself, doubling fetches.
 - **A photograph only comes from a source already tied to this person** —
@@ -347,9 +354,21 @@ delegation paths for custom agents.
 - **Deployment is the human approval boundary.** Saving produces a private READY
   version and never deploys it. The review screen shows its triggers, scope, actions,
   access and exact files. A user's Deploy action pins that immutable version for the
-  team. Scheduled runner sessions use task mode and therefore cannot pause for a
-  per-action approval; the deployed permission and idempotent runtime checks are the
+  team. Runner sessions use task mode and cannot park for an eve tool approval, so a
+  per-action approval is an application row, not an eve pause (next bullet). Without
+  `requiresApproval`, the deployed permission and idempotent runtime checks are the
   boundary.
+- **A Slack post can wait for a person.** A `slack.message.post` manifest action with
+  `requiresApproval: true` (default `false`) does not call Slack. `post_slack_message`
+  stores the exact text on a `PLANNED` `AgentAction` (`metadata.approval`, shape in
+  `@crm/validation/agent-approval`), sets the run to `WAITING_FOR_APPROVAL` and tells
+  the model to stop. `agents.decideRunApproval` is session-only (an API key is denied
+  in `authorizeApiKeyProcedure` and by `SessionOnlyMiddleware`) and only writes the
+  decision into that row. The next `drainAgentRuns` calls `settleSlackApprovals`:
+  approved resumes the run to `RUNNING`, posts with the stored replay id and finishes
+  it; rejected cancels the run with `APPROVAL_REJECTED` and sends nothing. The API
+  never posts. A `turn.failed` or `session.failed` after the request leaves the run waiting while the approval is undecided (`failRun` skips it). A waiting run counts as the agent's one active run until it is decided
+  or stopped, and an approved agent posts one message per run.
 - **Approved instructions are system context.** The runner resolves the pinned
   version instructions at `session.started`, then calls `inspect_run` for the manifest
   and current run state. Every runner tool also checks the `team-agent` purpose and
