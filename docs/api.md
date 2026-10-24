@@ -461,6 +461,62 @@ export is a plain query, and an agent can call it too.
 - **The browser downloads the text it gets back.** The list pages build a `Blob` from
   the query result with a BOM, so Excel reads UTF-8. There is no download route.
 
+### Import: a dry run first, then the same file again
+
+`csv.import` takes `{ entity, csv, dryRun, mapping? }` and returns
+`{ dryRun, create, update, skip, errors[{ row, message }], skipped[{ row, message }], ignoredColumns }`.
+Always send `dryRun: true` first. It reads and plans, and it writes nothing.
+
+- **It is a mutation, so it needs `crm:write`.** A browser session and a
+  `crm_integration` key can import. `agent_propose` and `agent_read` keys are denied by
+  `authorizeApiKeyProcedure`. **There is no MCP tool for it**: an import is a bulk write
+  that an agent cannot take back, so `export_csv` is the only CSV tool.
+- **It reads the headers the export writes**, case-insensitively, so export then import
+  round-trips. `id`, `source` and `createdAt` are read as nothing. `mapping` renames a
+  header to a column (`{ "Account": "name" }`). A `field:<key>` column writes a custom
+  field. Any other column is listed in `ignoredColumns` and left alone.
+  - HubSpot names accepted: companies `Company name`, `Company Domain Name`, `Domain Name`,
+    `Website URL`, `Phone Number`, `Country/Region`, `LinkedIn Company Page`; contacts
+    `First Name`, `Last Name`, `Email Address`, `Phone Number`, `Job Title`,
+    `Company Domain Name`, `Company Name`, `Associated Company`; deals `Deal Name`,
+    `Deal Description`, `Deal Stage`, `Close Date`, `Company Domain Name`, `Company Name`,
+    `Associated Company`. `Email`, `Phone`, `Industry`, `City`, `Amount` and the like
+    already match a column.
+  - **Stages** are the `DealStage` names or their words, in any case: `Closed won`,
+    `CLOSED_WON`, `Unqualified`. A stage the CRM does not have is a row error.
+- **Rows are validated with Zod.** A bad row is a line in `errors` with its row number
+  and the other rows still run. Row 2 is the first row below the header. A row counts
+  once, however many lines a quoted cell spans. A file with no usable header, an
+  unclosed quote, or more rows or bytes than `CSV.import` allows is refused whole, with
+  `BAD_REQUEST`.
+- **Dedupe keys.** Companies match on `domain`; a company with no domain matches an
+  active company with no domain and the same name. Contacts match on email, any case
+  (`normalizeEmail`). Deals match on name plus company. Archived records never match.
+  The same key twice in one file is an error on the second row.
+- **A match is updated, and only where the file differs.** A blank cell never clears a
+  value. A row that would change nothing is counted in `skip`. This matters for deals: a
+  changed `amount` or `currency` goes through `deals.update`, which freezes a new rate
+  (`docs/currency.md`), and an unchanged one is never sent, so re-importing an old file
+  does not move a closed quarter.
+- **Records first, associations second.** Contacts and deals name their company by
+  `companyDomain`, or by `companyName` when the file has no domain. The company must
+  already exist, so import companies, then contacts, then deals. A company that cannot
+  be found is a row error. A contact with a company and no `companyDomain` keeps the
+  company that `contacts.create` finds from the email domain, as for a manual create.
+- **Writes go through `CompaniesService`, `ContactsService` and `DealsService`**, one
+  call per row, so CRM events and the agent's `AgentTask` rows are written as for a
+  manual create, and the frozen exchange rate comes from `ConversionService`. Created
+  companies and contacts carry `source = IMPORT` (the services take it as an option, the
+  tRPC inputs do not). A deal has no source. Each service call is its own transaction:
+  a failed row never rolls back the others, and `MAX_BULK_IDS` rows form one batch.
+- **A removed contact stays removed.** An email in `SuppressedContact` that has no active
+  contact is counted in `skip`, with the reason in `skipped`. `contacts.create` lifts a
+  suppression because a rep typed the address; a file is not a rep.
+- **A deal needs an owner.** A blank `ownerEmail` is the person who runs the import.
+  `ownerEmail` must be the email of a user; an unknown one is a row error.
+- **`CSV.import` (`csv-config.ts`)** caps `maxRows` (500) and `maxBytes` (2 MiB). Every
+  row is several writes and a Vercel function stops at 60 seconds. Split a bigger file.
+
 ## Freshness: invalidate the query, don't disable the cache
 
 - **Invalidate in `onSuccess` through `useCrmCache()`** (`lib/trpc/cache.ts`), never by

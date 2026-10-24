@@ -12,7 +12,11 @@ import { FieldsService } from "../fields/fields.service";
 import { CSV_COLUMNS, type CsvEntity, FIELD_PREFIX } from "./csv-columns";
 import { CSV } from "./csv-config";
 
-export type CsvRecord = { id: string; cells: CsvRow };
+export type CsvRecord = {
+	id: string;
+	companyId: string | null;
+	cells: CsvRow;
+};
 
 type ExportLimits = { maxRows: number; pageSize: number };
 
@@ -27,7 +31,7 @@ export type CsvExport = {
 const OWNER_SELECT = { select: { email: true } } as const;
 const COMPANY_SELECT = { select: { domain: true, name: true } } as const;
 
-const FIELD_ENTITIES = {
+export const FIELD_ENTITIES = {
 	companies: "COMPANY",
 	contacts: "CONTACT",
 	deals: "DEAL",
@@ -106,6 +110,7 @@ export class CsvExportService {
 			"companies",
 			rows.map((row) => ({
 				id: row.id,
+				companyId: null,
 				cells: {
 					id: row.id,
 					name: row.name,
@@ -141,6 +146,7 @@ export class CsvExportService {
 			"contacts",
 			rows.map((row) => ({
 				id: row.id,
+				companyId: row.companyId,
 				cells: {
 					id: row.id,
 					firstName: row.firstName,
@@ -175,6 +181,7 @@ export class CsvExportService {
 			"deals",
 			rows.map((row) => ({
 				id: row.id,
+				companyId: row.companyId,
 				cells: {
 					id: row.id,
 					name: row.name,
@@ -218,7 +225,7 @@ export class CsvExportService {
 			records.map((record) => record.id),
 		);
 		return records.map((record) => ({
-			id: record.id,
+			...record,
 			cells: { ...record.cells, ...fieldCells.get(record.id) },
 		}));
 	}

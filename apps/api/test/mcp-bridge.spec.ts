@@ -592,6 +592,71 @@ describe("MCP contract", () => {
 	});
 });
 
+describe("CSV import over REST", () => {
+	const post = (key: string, dryRun: boolean) =>
+		fetch(new URL("/rest/csv/import", endpoint), {
+			method: "POST",
+			headers: { "x-api-key": key, "content-type": "application/json" },
+			body: JSON.stringify({
+				entity: "companies",
+				csv: `name,domain\r\nImported,imported-${prefix}.test\r\n`,
+				dryRun,
+			}),
+		});
+
+	afterEach(async () => {
+		const imported = await db.company.findMany({
+			where: { domain: `imported-${prefix}.test` },
+			select: { id: true },
+		});
+		const ids = imported.map((company) => company.id);
+		await db.agentTask.deleteMany({ where: { companyId: { in: ids } } });
+		await db.company.deleteMany({ where: { id: { in: ids } } });
+	});
+
+	it("I1 keeps import out of MCP and denies it to every agent profile", async () => {
+		expect(MCP_TOOLS.some((tool) => tool.procedure === "csv.import")).toBe(
+			false,
+		);
+		for (const profile of ["agent_read", "agent_propose"] as const) {
+			const key = await createKey(profile);
+			const response = await post(key.key, false);
+			expect(response.status).toBe(403);
+		}
+		expect(
+			await db.company.count({ where: { domain: `imported-${prefix}.test` } }),
+		).toBe(0);
+	});
+
+	it("I2 lets an integration key check a file, then import it", async () => {
+		const key = await createKey("crm_integration");
+		const report = z.object({
+			dryRun: z.boolean(),
+			create: z.number(),
+			errors: z.array(z.unknown()),
+		});
+
+		const dry = await post(key.key, true);
+		expect(dry.status).toBe(200);
+		expect(report.parse(await dry.json())).toMatchObject({
+			dryRun: true,
+			create: 1,
+			errors: [],
+		});
+		expect(
+			await db.company.count({ where: { domain: `imported-${prefix}.test` } }),
+		).toBe(0);
+
+		const applied = await post(key.key, false);
+		expect(applied.status).toBe(200);
+		expect(report.parse(await applied.json()).create).toBe(1);
+		const stored = await db.company.findFirstOrThrow({
+			where: { domain: `imported-${prefix}.test` },
+		});
+		expect(stored.source).toBe("IMPORT");
+	});
+});
+
 const existingProfileTools = {
 	crm_integration: [
 		"sales_get_request",
@@ -853,6 +918,7 @@ describe("MCP profile discovery", () => {
 			["my_tasks", {}],
 			["follow_ups", { timeZone: "UTC", days: 1 }],
 			["list_fields", { entity: "CONTACT" }],
+			["export_csv", { entity: "companies" }],
 		]);
 		await db.activity.create({
 			data: {
