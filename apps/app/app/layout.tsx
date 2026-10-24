@@ -25,14 +25,6 @@ export const metadata: Metadata = {
 		template: "%s · Comp AI CRM",
 	},
 	description: "Customer Relationship Management for Comp AI",
-	icons: {
-		icon: [
-			{ url: "/favicon.svg", type: "image/svg+xml" },
-			{ url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
-		],
-		apple: "/apple-touch-icon.png",
-	},
-	manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({
