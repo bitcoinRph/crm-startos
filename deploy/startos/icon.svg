@@ -1,9 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#F9F7F2"/>
-  <g fill="none" stroke="#26201A" stroke-width="2">
-    <rect x="5" y="5" width="22" height="22"/>
-    <line x1="16" y1="5" x2="16" y2="27"/>
-    <line x1="5" y1="16" x2="27" y2="16"/>
-  </g>
-  <rect x="16" y="5" width="11" height="11" fill="#A03E0F"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+<defs><clipPath id="tile"><rect width="1000" height="1000" rx="350" ry="350"/></clipPath><rect id="cell" width="0.375" height="0.375"/></defs>
+<g clip-path="url(#tile)"><rect width="1000" height="1000" fill="#FFFFFF"/>
+<g transform="matrix(12.5,0,0,12.5,150,150)"><path id="slab" fill="#16171B" fill-rule="evenodd" d="M41 13.3327L39.3682 12.16L28.5853 4.41866C28.2368 4.16845 27.7675 4.16844 27.419 4.41863L2.41685 22.3661C2.15517 22.5539 2 22.8563 2 23.1784V32.8194C2 33.1415 2.15515 33.4439 2.41681 33.6317L27.4189 51.5813C27.7675 51.8315 28.2368 51.8315 28.5854 51.5812L53.5833 33.6317C53.8449 33.4439 54 33.1415 54 32.8194V23.1784C54 22.8563 53.8448 22.5539 53.5832 22.3661L41 13.3327Z"/>
+<g id="top-plane" transform="matrix(26,18.666666666666668,-26,18.666666666666668,28,4)">
+<use id="top-orange" href="#cell" x="0.08333333333333333" y="0.08333333333333333" fill="#A03E0F"/>
+<use id="right-white" href="#cell" x="0.5416666666666666" y="0.08333333333333333" fill="#FFFFFF"/>
+<use id="left-white" href="#cell" x="0.08333333333333333" y="0.5416666666666666" fill="#FFFFFF"/>
+<use id="bottom-white" href="#cell" x="0.5416666666666666" y="0.5416666666666666" fill="#FFFFFF"/>
+</g></g></g></svg>
