@@ -124,6 +124,7 @@ single place that knows what is set.
 | `PERPLEXITY_API_KEY` | Open-web research with citations; finds a LinkedIn slug |
 | `GITHUB_TOKEN` | Raises the GitHub rate limit from 60/hour |
 | `BLOB_READ_WRITE_TOKEN` | Mirrors logos and photos into Blob |
+| `CRM_MEDIA_DIR` | Absolute directory that keeps those pictures on the server's own disk; the app serves them at `/media/<name>`. Wins over Blob when both are set |
 | `CRM_INFERENCE_MODE` | Explicit `LOCAL` or `LEGACY_GATEWAY` selection |
 | `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS` | Comma-separated non-loopback hosts allowed in local mode |
 | `CRM_LOCAL_INFERENCE_JSON` | Operator-managed local profile; see `local-inference.md` |
@@ -133,6 +134,11 @@ single place that knows what is set.
 `BLOB_READ_WRITE_TOKEN` is also in `env.validation.ts` and `apps/api/turbo.json`
 because the API and the seed write pictures too. The Next.js app is deliberately
 excluded — recognising our URL for the image optimizer needs no token.
+
+`CRM_MEDIA_DIR` is read by the same writers **and by the Next.js app**, which serves
+the files (`apps/app/app/media/[name]/route.ts`). It is in `env.validation.ts` and
+`turbo.json` for that reason. Every process must see one directory, or a picture the
+agent wrote is a 404 in the browser.
 
 ### Local inference
 

@@ -8,6 +8,7 @@ export const postgresPort = 5432
 
 export const appDir = '/app'
 export const assetsDir = '/assets'
+export const mediaDir = '/data/media'
 
 export const secretCharset = 'a-z,A-Z,0-9'
 export const hexCharset = 'a-f,0-9'

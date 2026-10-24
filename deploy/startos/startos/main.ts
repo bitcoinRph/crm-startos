@@ -9,6 +9,7 @@ import {
   assetsDir,
   csvList,
   localInferenceContextWindowTokens,
+  mediaDir,
   ollamaHostId,
   ollamaPackageId,
   ollamaPort,
@@ -114,6 +115,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     AGENT_URL: `http://127.0.0.1:${agentPort}`,
     AGENT_BRIDGE_SECRET: store.bridgeSecret,
     CRON_SECRET: store.cronSecret,
+    CRM_MEDIA_DIR: mediaDir,
     ...optional('CRM_SECRETS_KEY', store.secretsKey),
     CRM_INFERENCE_MODE: inferenceMode,
     ...optional('CRM_LOCAL_INFERENCE_ALLOWED_HOSTS', localInferenceHost),
@@ -156,6 +158,12 @@ export const main = sdk.setupMain(async ({ effects }) => {
         volumeId: 'main',
         subpath: 'agent/sandbox-cache',
         mountpoint: `${appDir}/apps/agent/.eve/sandbox-cache`,
+        readonly: false,
+      })
+      .mountVolume({
+        volumeId: 'main',
+        subpath: 'media',
+        mountpoint: mediaDir,
         readonly: false,
       })
       .mountAssets({ subpath: null, mountpoint: assetsDir }),

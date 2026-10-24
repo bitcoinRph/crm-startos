@@ -1,5 +1,5 @@
 import { db } from "@crm/db";
-import { blobEnabled, isMirrored, mirror } from "@crm/db/blob";
+import { isMirrored, mirror, mirrorEnabled } from "@crm/db/blob";
 import { COMPANY_IMAGE_FIELDS, type CompanyImageField } from "@crm/db/images";
 import { z } from "zod";
 import { brandToUpdate } from "../agent/lib/brand-mapping";
@@ -10,10 +10,10 @@ type CompanyImagePatch = Partial<
 
 const storedText = z.string().nullable().catch(null);
 
-if (!blobEnabled()) {
+if (!mirrorEnabled()) {
 	console.warn(
-		"No BLOB_READ_WRITE_TOKEN — icon tone and dark artwork will still be " +
-			"filled in, but nothing will be copied into Blob.",
+		"No CRM_MEDIA_DIR or BLOB_READ_WRITE_TOKEN — icon tone and dark artwork will still be " +
+			"filled in, but no picture will be copied.",
 	);
 }
 

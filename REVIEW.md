@@ -135,7 +135,7 @@ name only (`apps/api/src/api-keys/api-keys.contracts.ts:10`,
 | Vercel AI Gateway | Only in `LEGACY_GATEWAY` mode with a stored key. Off by default. OK. |
 | Model catalog `ai-gateway.vercel.sh/v1/models` | `GET /settings/model-catalog` still exists. The settings page hides the catalog in `LOCAL` mode. A direct call still egresses. Nice-to-have N4. |
 | Vercel Sandbox | Not used. just-bash in process. OK. |
-| Vercel Blob | `mirror()` returns null without a token. No filesystem backend. Follow-up (FOLLOWUPS.md). |
+| Vercel Blob | `CRM_MEDIA_DIR=/data/media` keeps pictures on the `main` volume; no Blob account needed. OK. |
 | Neon | No Neon code. PostgreSQL 17 sidecar. OK. |
 | Upstash / Redis | In-memory fallback. OK for one process. |
 | Vercel OIDC | Evals only. N/A. |

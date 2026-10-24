@@ -71,3 +71,30 @@ describe("COMPANY_IMAGE_FIELDS", () => {
 		]);
 	});
 });
+
+describe("our own media path", () => {
+	const KEY = "/media/contacts-c1-0123456789ab";
+
+	it("is recognised as ours", () => {
+		expect(isMirrored(`${KEY}.jpg`)).toBe(true);
+		expect(isMirrored(`${KEY}.svg`)).toBe(true);
+	});
+
+	it("does not recognise anything that is not a key", () => {
+		expect(isMirrored("/media/../etc/passwd")).toBe(false);
+		expect(isMirrored("/media/evil.html")).toBe(false);
+		expect(isMirrored("/media/a/b-0123456789ab.png")).toBe(false);
+		expect(isMirrored("//evil.com/media/c1-0123456789ab.png")).toBe(false);
+		expect(isMirrored("https://evil.com/media/c1-0123456789ab.png")).toBe(
+			false,
+		);
+		expect(isMirrored("/other/c1-0123456789ab.png")).toBe(false);
+	});
+
+	it("optimizes a raster and refuses an svg or an ico", () => {
+		expect(isOptimizable(`${KEY}.png`)).toBe(true);
+		expect(isOptimizable(`${KEY}.avif`)).toBe(true);
+		expect(isOptimizable(`${KEY}.svg`)).toBe(false);
+		expect(isOptimizable(`${KEY}.ico`)).toBe(false);
+	});
+});
