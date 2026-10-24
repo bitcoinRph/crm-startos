@@ -451,6 +451,38 @@ Below is `purge`'s contract — everything that used to be `delete`'s:
 - **Recompute after commit, logging rather than throwing** — the row is already gone,
   and a raised error makes the browser skip invalidation and retry into a 404.
 
+## Every record change lands in the ledger
+
+`recordChange` holds one row per change to a company, contact, deal or custom-field
+value: the changed columns before and after, and who made the change. A Postgres
+trigger (`crm_record_change`, migration `20261024160000_record_changes`) writes it in
+the same statement as the change, so no write path can skip it — services, CSV
+import, mail sync, the agent and raw SQL included.
+
+- **The actor is a connection setting, not an argument.** `runAsChangeActor`
+  (`@crm/db/change-actor`) holds the actor in `AsyncLocalStorage`. The pool in
+  `packages/db/src/client.ts` sets `crm.actor` on the connection before each write
+  statement and at the start of each transaction. `AuthMiddleware` runs every tRPC,
+  MCP and REST call as `USER` or `API_KEY`; `apps/agent/agent/agent.ts` makes the
+  agent's default `AGENT`; anything else is `SYSTEM`. `runAsChangeActor` awaits
+  inside the context, because a Prisma promise runs only when it is awaited.
+- **Only real changes are rows.** An update stores the changed columns only, minus
+  the bookkeeping columns the trigger is created with (`updatedAt`,
+  `lastActivityAt`, enrichment status, the deal's `stageChangedAt` and exchange-rate
+  columns). A create stores the operation, not the values. A custom-field insert or
+  delete is an update of that field's value, with `fieldId` set.
+- **A purge forgets the record.** Deleting a company, contact or deal deletes its
+  ledger rows in the same statement, and a cascaded field-value delete writes none.
+  The archive prune deletes rows older than `archiveRetentionDays`.
+- **`recordChanges.list` reads it** (`crm:read`; MCP tool `record_history`): by
+  record (`entity` + `recordId`) or by key (`apiKeyId`), newest first.
+- **`recordChanges.revert` is for a person only.** Every key is denied
+  (`HUMAN_ONLY_PROCEDURE`). It refuses with `CONFLICT` when a changed column has
+  moved since, and it undoes through the services (`update`, `archive`/`restore`,
+  `setStage`), so normalisation, exchange rates and events run as for any edit. The
+  undo is itself a ledger row. Custom-field values and creates cannot be undone here;
+  `revertible` in the list says which rows can.
+
 ## Money
 
 A deal is sold in one currency and reported in another, and **only `baseAmount` may

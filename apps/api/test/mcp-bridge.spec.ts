@@ -13,6 +13,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { setImmediate } from "node:timers/promises";
 import { API_KEY_RATE_LIMIT, auth } from "@crm/auth";
 import { db } from "@crm/db";
+import { runAsChangeActor } from "@crm/db/change-actor";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -32,6 +33,7 @@ import {
 	KEY_PERMISSIONS,
 } from "../src/api-keys/api-key-profiles";
 import { MCP_TOOLS } from "../src/mcp/mcp-tools";
+import { RecordChangesService } from "../src/record-changes/record-changes.service";
 import {
 	salesPendingOutput,
 	salesReviewQueueOutput,
@@ -772,18 +774,21 @@ const profileTools = {
 		"follow_ups",
 		"intake_submit",
 		"export_csv",
+		"record_history",
 	],
 	agent_propose: [
 		...existingProfileTools.agent_propose,
 		"resolve_customer",
 		"follow_ups",
 		"export_csv",
+		"record_history",
 	],
 	agent_read: [
 		...existingProfileTools.agent_read,
 		"resolve_customer",
 		"follow_ups",
 		"export_csv",
+		"record_history",
 	],
 	legacy: [
 		...existingProfileTools.legacy,
@@ -791,6 +796,7 @@ const profileTools = {
 		"follow_ups",
 		"intake_submit",
 		"export_csv",
+		"record_history",
 	],
 	intake: ["intake_submit"],
 } as const;
@@ -928,6 +934,7 @@ describe("MCP profile discovery", () => {
 			["follow_ups", { timeZone: "UTC", days: 1 }],
 			["list_fields", { entity: "CONTACT" }],
 			["export_csv", { entity: "companies" }],
+			["record_history", {}],
 		]);
 		await db.activity.create({
 			data: {
@@ -2191,5 +2198,254 @@ describe("MCP deterministic follow-ups", () => {
 			headers: { "x-api-key": readerKey.key },
 		});
 		expect(options.status).toBe(200);
+	});
+});
+
+const historyRow = z.object({
+	id: z.string(),
+	fieldId: z.string().nullable(),
+	fieldLabel: z.string().nullable(),
+	before: z.record(z.string(), z.unknown()).nullable(),
+	after: z.record(z.string(), z.unknown()).nullable(),
+	actorKind: z.string(),
+	actorId: z.string().nullable(),
+	actorUserId: z.string().nullable(),
+	revertible: z.boolean(),
+});
+const history = z.array(historyRow);
+
+function contactHistory() {
+	return read(
+		"record_history",
+		{ entity: "CONTACT", recordId: contactId },
+		history,
+	);
+}
+
+function revertAsPerson(id: string) {
+	return fetch(new URL("/rest/record-changes/revert", endpoint), {
+		method: "POST",
+		headers: { "content-type": "application/json", cookie },
+		body: JSON.stringify({ id }),
+	});
+}
+
+describe("record change ledger", () => {
+	it("records which key changed a record and lists it through record_history", async () => {
+		const key = await createKey("crm_integration");
+		const writer = await connect({ "x-api-key": key.key });
+		const result = await call(writer, {
+			name: "update_contact",
+			arguments: { id: contactId, data: { title: "VP Sales" } },
+		});
+		expect(result.isError).not.toBe(true);
+
+		const [latest] = await contactHistory();
+		expect(latest).toMatchObject({
+			before: { title: null },
+			after: { title: "VP Sales" },
+			actorKind: "API_KEY",
+			actorId: key.id,
+			actorUserId: userId,
+			revertible: true,
+		});
+		const byKey = await read("record_history", { apiKeyId: key.id }, history);
+		expect(byKey.map((row) => row.id)).toContain(z.string().parse(latest?.id));
+	});
+
+	it("refuses an undo from every key and lets a person undo the change", async () => {
+		const key = await createKey("crm_integration");
+		const writer = await connect({ "x-api-key": key.key });
+		await call(writer, {
+			name: "update_contact",
+			arguments: { id: contactId, data: { title: "Head of Ops" } },
+		});
+		const [change] = await contactHistory();
+		const byKey = await fetch(
+			new URL("/rest/record-changes/revert", endpoint),
+			{
+				method: "POST",
+				headers: { "content-type": "application/json", "x-api-key": key.key },
+				body: JSON.stringify({ id: change?.id }),
+			},
+		);
+		expect(byKey.status).toBe(403);
+		expect(MCP_TOOLS.map((tool) => tool.procedure)).not.toContain(
+			"recordChanges.revert",
+		);
+
+		const byPerson = await revertAsPerson(z.string().parse(change?.id));
+		expect(byPerson.status).toBe(200);
+		const contact = await db.contact.findUniqueOrThrow({
+			where: { id: contactId },
+		});
+		expect(contact.title).toBeNull();
+		const [undo] = await contactHistory();
+		expect(undo).toMatchObject({
+			before: { title: "Head of Ops" },
+			after: { title: null },
+			actorKind: "USER",
+			actorId: userId,
+		});
+	});
+
+	it("refuses an undo after a newer change and changes nothing", async () => {
+		await runAsChangeActor({ kind: "AGENT" }, () =>
+			db.contact.update({ where: { id: contactId }, data: { title: "A" } }),
+		);
+		const [first] = await contactHistory();
+		await runAsChangeActor({ kind: "AGENT" }, () =>
+			db.contact.update({ where: { id: contactId }, data: { title: "B" } }),
+		);
+		expect(first?.actorKind).toBe("AGENT");
+
+		const response = await revertAsPerson(z.string().parse(first?.id));
+		expect(response.status).toBe(409);
+		const contact = await db.contact.findUniqueOrThrow({
+			where: { id: contactId },
+		});
+		expect(contact.title).toBe("B");
+	});
+
+	it("undoes an archive, skips bookkeeping-only writes and marks unattributed writes as SYSTEM", async () => {
+		const key = await createKey("crm_integration");
+		const archived = await fetch(
+			new URL(`/rest/contacts/${contactId}/archive`, endpoint),
+			{
+				method: "POST",
+				headers: { "content-type": "application/json", "x-api-key": key.key },
+				body: "{}",
+			},
+		);
+		expect(archived.status).toBe(200);
+		const [archive] = await contactHistory();
+		expect(archive?.after?.archivedAt).toBeString();
+
+		const restored = await revertAsPerson(z.string().parse(archive?.id));
+		expect(restored.status).toBe(200);
+		const contact = await db.contact.findUniqueOrThrow({
+			where: { id: contactId },
+		});
+		expect(contact.archivedAt).toBeNull();
+
+		const count = await db.recordChange.count({
+			where: { recordId: contactId },
+		});
+		await db.contact.update({
+			where: { id: contactId },
+			data: { lastActivityAt: new Date(), enrichmentStatus: "COMPLETE" },
+		});
+		expect(
+			await db.recordChange.count({ where: { recordId: contactId } }),
+		).toBe(count);
+		await db.contact.update({
+			where: { id: contactId },
+			data: { phone: "+1 555 0100" },
+		});
+		const [system] = await contactHistory();
+		expect(system).toMatchObject({ actorKind: "SYSTEM", actorId: null });
+	});
+
+	it("labels custom field changes, keeps them out of undo, and forgets a purged record", async () => {
+		const field = await db.fieldDefinition.create({
+			data: {
+				entity: "CONTACT",
+				key: `${prefix.replaceAll("-", "_")}_tier`,
+				label: "Tier",
+				type: "TEXT",
+				position: 999,
+			},
+		});
+		try {
+			await db.fieldValue.create({
+				data: { fieldId: field.id, contactId, text: "Gold" },
+			});
+			const [change] = await contactHistory();
+			expect(change).toMatchObject({
+				fieldId: field.id,
+				fieldLabel: "Tier",
+				after: { text: "Gold" },
+				revertible: false,
+			});
+			const response = await revertAsPerson(z.string().parse(change?.id));
+			expect(response.status).toBe(400);
+
+			await db.contact.delete({ where: { id: contactId } });
+			expect(
+				await db.recordChange.count({ where: { recordId: contactId } }),
+			).toBe(0);
+		} finally {
+			await db.fieldDefinition.delete({ where: { id: field.id } });
+		}
+	});
+
+	it("undoes a deal amount and a stage through the deal service", async () => {
+		const key = await createKey("crm_integration");
+		const writer = await connect({ "x-api-key": key.key });
+		const dealHistory = () =>
+			read("record_history", { entity: "DEAL", recordId: dealId }, history);
+		const before = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+
+		const priced = await call(writer, {
+			name: "update_deal",
+			arguments: { id: dealId, data: { amountCents: 125_000 } },
+		});
+		expect(priced.isError).not.toBe(true);
+		const [amount] = await dealHistory();
+		expect(amount).toMatchObject({ after: { amount: 1250 }, revertible: true });
+		const won = await call(writer, {
+			name: "set_deal_stage",
+			arguments: { id: dealId, stage: "CLOSED_WON" },
+		});
+		expect(won.isError).not.toBe(true);
+		const [stage] = await dealHistory();
+		expect(stage?.after).toMatchObject({ stage: "CLOSED_WON" });
+
+		expect((await revertAsPerson(z.string().parse(stage?.id))).status).toBe(
+			200,
+		);
+		expect((await revertAsPerson(z.string().parse(amount?.id))).status).toBe(
+			200,
+		);
+		const after = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+		expect(after.stage).toBe(before.stage);
+		expect(after.closedAt).toBeNull();
+		expect(after.amount).toBeNull();
+		expect(after.baseAmount).toBeNull();
+	});
+
+	it("prunes changes older than the retention window", async () => {
+		await db.contact.update({
+			where: { id: contactId },
+			data: { title: "Old" },
+		});
+		await db.contact.update({
+			where: { id: contactId },
+			data: { title: "New" },
+		});
+		const [newest, oldest] = await db.recordChange.findMany({
+			where: { recordId: contactId },
+			orderBy: { createdAt: "desc" },
+		});
+		const old = new Date("2000-01-01T00:00:00Z");
+		await db.recordChange.update({
+			where: { id: z.string().parse(oldest?.id) },
+			data: { createdAt: old },
+		});
+
+		const removed = await app
+			.get(RecordChangesService)
+			.purgeExpired(new Date("2000-01-02T00:00:00Z"));
+		expect(removed).toBeGreaterThanOrEqual(1);
+		expect(
+			await db.recordChange.findUnique({
+				where: { id: z.string().parse(oldest?.id) },
+			}),
+		).toBeNull();
+		expect(
+			await db.recordChange.findUnique({
+				where: { id: z.string().parse(newest?.id) },
+			}),
+		).not.toBeNull();
 	});
 });

@@ -1,4 +1,5 @@
 import { auth } from "@crm/auth";
+import { runAsChangeActor } from "@crm/db/change-actor";
 import { Inject, Injectable } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
 import type {
@@ -69,13 +70,18 @@ export class AuthMiddleware implements TRPCMiddleware {
 
 		setRequestUserId(user.id);
 		const nextCtx: AuthedTrpcContext = { ...ctx, user };
+		const actor = key
+			? { kind: "API_KEY" as const, id: key.id, userId: user.id }
+			: { kind: "USER" as const, id: user.id };
+		const next = () =>
+			runAsChangeActor(actor, () => opts.next({ ctx: nextCtx }));
 
 		if (decision !== "sales") {
 			record("allowed");
-			return opts.next({ ctx: nextCtx });
+			return next();
 		}
 
-		const result = await opts.next({ ctx: nextCtx });
+		const result = await next();
 		const refused =
 			!result.ok &&
 			result.error instanceof TRPCError &&
