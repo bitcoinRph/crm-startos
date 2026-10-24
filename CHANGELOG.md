@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/bitcoinRph/crm-startos/compare/v1.20.1...v1.21.0) (2026-10-24)
+
+
+### Features
+
+* **sales:** review queue, proposal rejection and board column totals ([#48](https://github.com/bitcoinRph/crm-startos/issues/48)) ([52d6e22](https://github.com/bitcoinRph/crm-startos/commit/52d6e22bf15504e50781a520a0e5daf308f0eb2d))
+
 ## [1.20.1](https://github.com/bitcoinRph/crm-startos/compare/v1.20.0...v1.20.1) (2026-10-24)
 
 
