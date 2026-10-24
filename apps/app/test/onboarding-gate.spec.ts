@@ -262,6 +262,17 @@ describe("proxy", () => {
 		).toBeNull();
 	});
 
+	it("serves the app icons to strangers and to signed-in reps", async () => {
+		setup();
+
+		for (const path of ["/icon/32", "/icon/512", "/apple-icon"]) {
+			expect(redirectedTo(await proxy(request(path)))).toBeNull();
+			expect(
+				redirectedTo(await proxy(request(path, [SESSION_COOKIE]))),
+			).toBeNull();
+		}
+	});
+
 	it("fails open when the API is unreachable", async () => {
 		stub(async () => {
 			throw new Error("connect ECONNREFUSED");

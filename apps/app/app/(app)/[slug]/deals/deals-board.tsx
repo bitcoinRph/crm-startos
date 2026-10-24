@@ -2,16 +2,19 @@
 
 import { Board, BoardCard, BoardColumn } from "@crm/ui/components/board";
 import { formatMoney } from "@crm/ui/lib/format";
+import { useState } from "react";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { DealStageMenu, useStageMutation } from "@/components/crm/stage-change";
-import { dropDeal, groupDealsByStage } from "@/lib/deal-board";
+import { applyStageMoves, dropDeal, groupDealsByStage } from "@/lib/deal-board";
 import { DEAL_BOARD } from "@/lib/deal-board-config";
 import { dealStageLabel, OPEN_STAGES } from "@/lib/deal-stage";
 import type { RouterOutputs } from "@/lib/trpc/types";
 
 type DealRow = RouterOutputs["deals"]["list"]["rows"][number];
+
+type DealStage = DealRow["stage"];
 
 export function DealsBoard({
 	rows,
@@ -23,17 +26,35 @@ export function DealsBoard({
 	const openRecord = useOpenRecord();
 	const prefetchRecord = usePrefetchRecord();
 	const setStage = useStageMutation();
-	const groups = groupDealsByStage(rows, OPEN_STAGES);
+	const [moves, setMoves] = useState<ReadonlyMap<string, DealStage>>(
+		() => new Map(),
+	);
+	const groups = groupDealsByStage(applyStageMoves(rows, moves), OPEN_STAGES);
+
+	const move = ({ id, stage }: { id: string; stage: DealStage }) => {
+		setMoves((current) => new Map(current).set(id, stage));
+		setStage.mutate(
+			{ id, stage },
+			{
+				onSettled: () =>
+					setMoves((current) => {
+						const next = new Map(current);
+						next.delete(id);
+						return next;
+					}),
+			},
+		);
+	};
 
 	return (
 		<>
 			{total > rows.length ? (
-				<p className="text-xs text-muted-foreground">
+				<p role="status" className="text-xs text-muted-foreground">
 					Showing the first {rows.length} of {total} open deals. Narrow the
 					filters to see the rest.
 				</p>
 			) : null}
-			<Board>
+			<Board aria-label="Deals by stage">
 				{OPEN_STAGES.map((stage) => {
 					const deals = groups.get(stage) ?? [];
 					return (
@@ -43,12 +64,13 @@ export function DealsBoard({
 							title={dealStageLabel(stage)}
 							count={deals.length}
 							dragType={DEAL_BOARD.dragType}
+							empty="Drop a deal here."
 							onDropItem={(dealId) =>
 								dropDeal({
 									dealId,
 									target: stage,
-									rows,
-									setStage: setStage.mutate,
+									rows: applyStageMoves(rows, moves),
+									setStage: move,
 								})
 							}
 						>
@@ -56,14 +78,18 @@ export function DealsBoard({
 								<BoardCard
 									key={deal.id}
 									itemId={deal.id}
+									label={deal.name}
 									dragType={DEAL_BOARD.dragType}
+									data-stage={deal.stage}
+									data-pending={moves.has(deal.id) || undefined}
 									onOpen={() => openRecord({ kind: "deal", id: deal.id })}
 									onHover={() => prefetchRecord({ kind: "deal", id: deal.id })}
 									actions={
 										<DealStageMenu
 											dealId={deal.id}
 											stage={deal.stage}
-											variant="control"
+											variant="compact"
+											label={`Change the stage of ${deal.name}`}
 										/>
 									}
 								>

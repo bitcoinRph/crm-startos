@@ -35,10 +35,13 @@ import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
+import { LocalDateTime } from "@/components/local-date-time";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 
 const SECOND_MS = 1000;
+
+const DATE_TIME = { dateStyle: "medium", timeStyle: "short" } as const;
 
 type SignIn = {
 	verificationUrl: string;
@@ -163,7 +166,7 @@ function NotConnected() {
 						{new Date(signIn.expiresAt).toLocaleTimeString()}. This page
 						finishes by itself.
 					</FieldDescription>
-					<div className="flex items-center gap-2">
+					<div role="status" className="flex items-center gap-2">
 						<Spinner />
 						<span className="text-muted-foreground text-xs">
 							Waiting for OpenAI
@@ -283,7 +286,7 @@ function Connected() {
 						<>
 							<DescriptionTerm>Since</DescriptionTerm>
 							<DescriptionDetails>
-								{new Date(codex.connectedAt).toLocaleString()}
+								<LocalDateTime date={codex.connectedAt} options={DATE_TIME} />
 							</DescriptionDetails>
 						</>
 					) : null}
@@ -329,7 +332,7 @@ function Connected() {
 						{models.data && !models.data.available
 							? models.data.reason
 							: codex.modelId
-								? `${codex.modelId} · ${codex.modelContextWindowTokens?.toLocaleString()} token context. Conversations already open keep the model they started with.`
+								? `${codex.modelId}${codex.modelContextWindowTokens ? ` · ${codex.modelContextWindowTokens.toLocaleString("en-US")} token context` : ""}. Conversations already open keep the model they started with.`
 								: "No model chosen yet. Conversations keep using the deployment's inference mode until you choose one."}
 					</FieldDescription>
 				</Field>

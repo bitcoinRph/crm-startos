@@ -196,6 +196,7 @@ export function AgentRuns({
 								<Button
 									size="sm"
 									disabled={deciding}
+									aria-label={`Approve the post to ${run.pendingApproval.destination}`}
 									onClick={() => onDecide(run.id, "APPROVE")}
 								>
 									Approve
@@ -204,6 +205,7 @@ export function AgentRuns({
 									variant="outline"
 									size="sm"
 									disabled={deciding}
+									aria-label={`Reject the post to ${run.pendingApproval.destination}`}
 									onClick={() => onDecide(run.id, "REJECT")}
 								>
 									Reject

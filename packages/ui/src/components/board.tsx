@@ -22,6 +22,7 @@ function BoardColumn({
 	count,
 	dragType,
 	onDropItem,
+	empty,
 	className,
 	children,
 	...props
@@ -31,16 +32,20 @@ function BoardColumn({
 	count: number;
 	dragType: string;
 	onDropItem: (itemId: string) => void;
+	empty?: React.ReactNode;
 }) {
 	const [over, setOver] = React.useState(false);
+	const titleId = React.useId();
 
 	return (
 		<section
 			data-slot="board-column"
 			data-board-column={columnId}
+			data-count={count}
 			data-over={over || undefined}
+			aria-labelledby={titleId}
 			className={cn(
-				"flex min-h-0 flex-col gap-2 rounded-lg border bg-muted/40 p-2 data-over:bg-muted",
+				"flex min-h-0 flex-col gap-2 rounded-lg border bg-muted/40 p-2 transition-colors data-over:bg-muted data-over:ring-2 data-over:ring-ring/40",
 				className,
 			)}
 			onDragOver={(event) => {
@@ -64,13 +69,24 @@ function BoardColumn({
 			}}
 			{...props}
 		>
-			<header className="flex items-center justify-between gap-2 px-1 text-xs font-medium">
-				<span className="truncate">{title}</span>
+			<header className="flex items-center justify-between gap-2 px-1 py-0.5 text-xs font-medium">
+				<h2 id={titleId} className="truncate">
+					{title}
+				</h2>
 				<span className="text-muted-foreground tabular-nums">{count}</span>
 			</header>
-			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-				{children}
-			</div>
+			<ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+				{count === 0 && empty ? (
+					<li
+						data-slot="board-column-empty"
+						className="rounded-lg border border-dashed px-3 py-6 text-center text-muted-foreground text-xs"
+					>
+						{empty}
+					</li>
+				) : (
+					children
+				)}
+			</ul>
 		</section>
 	);
 }
@@ -80,26 +96,29 @@ function BoardCard({
 	dragType,
 	onOpen,
 	onHover,
+	label,
 	actions,
 	className,
 	children,
 	...props
-}: Omit<React.ComponentProps<"div">, "onDragStart" | "draggable"> & {
+}: Omit<React.ComponentProps<"li">, "onDragStart" | "draggable"> & {
 	itemId: string;
 	dragType: string;
 	onOpen: () => void;
 	onHover?: () => void;
+	label: string;
 	actions?: React.ReactNode;
 }) {
 	const [dragging, setDragging] = React.useState(false);
 
 	return (
-		<div
+		<li
 			data-slot="board-card"
+			data-board-item={itemId}
 			data-dragging={dragging || undefined}
 			draggable
 			className={cn(
-				"flex cursor-grab flex-col gap-2 rounded-lg border bg-card p-3 active:cursor-grabbing data-dragging:opacity-50",
+				"flex cursor-grab items-start gap-2 rounded-lg border bg-card p-3 text-xs/relaxed transition-[opacity,box-shadow] hover:ring-1 hover:ring-foreground/10 active:cursor-grabbing has-focus-visible:ring-2 has-focus-visible:ring-ring/50 data-dragging:opacity-50",
 				className,
 			)}
 			onDragStart={(event) => {
@@ -112,14 +131,16 @@ function BoardCard({
 		>
 			<button
 				type="button"
-				className="flex min-w-0 flex-col items-start gap-1 text-left"
+				aria-label={`Open ${label}`}
+				className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left outline-none"
 				onClick={onOpen}
 				onMouseEnter={onHover}
+				onFocus={onHover}
 			>
 				{children}
 			</button>
 			{actions}
-		</div>
+		</li>
 	);
 }
 

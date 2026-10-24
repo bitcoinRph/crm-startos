@@ -254,6 +254,7 @@ export function DealsTable() {
 				<>
 					<ToggleGroup
 						type="single"
+						aria-label="View"
 						variant="outline"
 						size="sm"
 						spacing={0}

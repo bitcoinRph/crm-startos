@@ -56,10 +56,12 @@ export function DealStageMenu({
 	dealId,
 	stage,
 	variant = "inline",
+	label,
 }: {
 	dealId: string;
 	stage: DealStage;
-	variant?: "inline" | "control";
+	variant?: "inline" | "control" | "compact";
+	label?: string;
 }) {
 	const [, setCloseParams] = useQueryStates(closeReasonParams);
 	const setStage = useStageMutation();
@@ -67,7 +69,17 @@ export function DealStageMenu({
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				{variant === "control" ? (
+				{variant === "compact" ? (
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						aria-label={label ?? "Change the stage"}
+						disabled={setStage.isPending}
+						onClick={(event) => event.stopPropagation()}
+					>
+						<Icon icon={ChevronDown} />
+					</Button>
+				) : variant === "control" ? (
 					<Button
 						variant="outline"
 						size="sm"
@@ -89,7 +101,7 @@ export function DealStageMenu({
 				)}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
-				align={variant === "control" ? "end" : "start"}
+				align={variant === "inline" ? "start" : "end"}
 				className="min-w-52"
 				onClick={(event) => event.stopPropagation()}
 			>

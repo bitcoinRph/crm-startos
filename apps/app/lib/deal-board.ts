@@ -16,6 +16,17 @@ export function groupDealsByStage<TDeal extends BoardDeal>(
 	return groups;
 }
 
+export function applyStageMoves<TDeal extends BoardDeal>(
+	deals: readonly TDeal[],
+	moves: ReadonlyMap<string, DealStage>,
+): TDeal[] {
+	if (moves.size === 0) return [...deals];
+	return deals.map((deal) => {
+		const stage = moves.get(deal.id);
+		return stage === undefined ? deal : { ...deal, stage };
+	});
+}
+
 export function dropDeal({
 	dealId,
 	target,
