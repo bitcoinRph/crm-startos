@@ -45,7 +45,7 @@ function PageShellHeader({
 			)}
 			{...props}
 		>
-			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
+			<div className="grid grid-cols-1 items-center gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
 				{children}
 			</div>
 		</header>
@@ -102,7 +102,7 @@ function PageShellActions({
 		<div
 			data-slot="page-shell-actions"
 			className={cn(
-				"col-start-2 row-start-1 flex flex-wrap items-center gap-2 self-center justify-self-end",
+				"flex flex-wrap items-center gap-2 self-center justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end",
 				className,
 			)}
 			{...props}

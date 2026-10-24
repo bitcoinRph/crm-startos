@@ -23,6 +23,12 @@ import { useState } from "react";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { useTRPC } from "@/lib/trpc/client";
 
+function callTypeLabel(type: string) {
+	if (type === "query") return "Read";
+	if (type === "mutation") return "Write";
+	return type;
+}
+
 const COLUMNS: SimpleTableColumn[] = [
 	{ id: "when", header: "When", width: "w-[22%]" },
 	{ id: "procedure", header: "Procedure", width: "w-[44%]" },
@@ -66,7 +72,10 @@ export function ApiKeyCallsSheet({
 					<SimpleTable columns={COLUMNS} className="table-fixed">
 						{calls.data?.length ? (
 							calls.data.map((call) => (
-								<SimpleTableRow key={`${call.createdAt}-${call.procedure}`}>
+								<SimpleTableRow
+									key={`${call.createdAt}-${call.procedure}`}
+									data-outcome={call.outcome}
+								>
 									<TableCell className="px-3 py-2 text-muted-foreground">
 										<LocalRelativeTime date={call.createdAt} />
 									</TableCell>
@@ -76,7 +85,7 @@ export function ApiKeyCallsSheet({
 										</span>
 									</TableCell>
 									<TableCell className="px-3 py-2 text-muted-foreground">
-										{call.type}
+										{callTypeLabel(call.type)}
 									</TableCell>
 									<TableCell className="px-3 py-2">
 										<Badge
@@ -95,7 +104,11 @@ export function ApiKeyCallsSheet({
 									colSpan={COLUMNS.length}
 									className="h-24 text-center text-muted-foreground"
 								>
-									{calls.isPending ? "Loading…" : "No calls yet."}
+									{calls.isError
+										? `Could not load the calls. ${calls.error.message}`
+										: calls.isPending
+											? "Loading…"
+											: "No calls yet."}
 								</TableCell>
 							</SimpleTableRow>
 						)}
