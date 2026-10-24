@@ -61,7 +61,7 @@ The fixes on this branch correct these problems. They add stable `data-*` hooks 
 | Features built to prove an API, not to serve a rep | UX, Design, DX | The commits tested the contract (IDs, revisions, profiles) and gave the contract's form to the user. | Show words to people and IDs to machines. IDs go in a "Details" block and in `data-*` attributes. |
 | No stable hooks for agents and automation | DX, A11y | Components had a `data-slot` but no item ids or states. | `data-board-item`, `data-stage`, `data-pending`, `data-count`, `data-status`, `data-operation` and `data-outcome`, plus accessible names on every control. |
 | Call-site style overrides instead of variants | Repo, Design | `className="sm:max-w-(--container-*)"` on dialogs, and no size variants. | `DialogContent size`, `DescriptionList size`, `DescriptionDetails mono` and `Textarea size="bounded"` in `packages/ui`. |
-| A missing review inbox | UX, DX | `sales.pendingRequests` returns only `PENDING`. Nothing lists `PROPOSED` requests. | A new `sales.reviewQueue` query and a list on the sales page. Not done. |
+| A missing review inbox | UX, DX | `sales.pendingRequests` returns only `PENDING`. Nothing lists `PROPOSED` requests. | A new `sales.reviewQueue` query, the `sales_review_queue` MCP tool and a list on the sales page. Done in the second pass. |
 
 ## All Recommendations
 
@@ -76,9 +76,9 @@ The fixes on this branch correct these problems. They add stable `data-*` hooks 
 | R7 | Show a column example in the import textarea, per entity. | UX | `import-csv-dialog.tsx` | `EXAMPLES` placeholder | Fixed |
 | R8 | Replace Check/Import with Done after an import. | UX | `import-csv-dialog.tsx` | Conditional footer | Fixed |
 | R9 | Give the sales rail item the same name as the page. | UX | `app-icon-rail.tsx` | "Sales proposals" | Fixed |
-| R10 | Add a column money total on the board. | UX | `deals-board.tsx` | It needs `baseAmount` per row. `docs/currency.md` forbids summing `amount`. | Not done |
-| R11 | Add a copy button for the intake endpoint URL. | DX | `connections/intake/page.tsx` | Copy control | Not done |
-| R12 | Add a way to discard or reject a proposal. | UX | API + `sales-workflow.tsx` | `sales.rejectProposal` | Not done |
+| R10 | Add a column money total on the board. | UX | `deals-board.tsx` | `deals.stageValues`: a `countedWhere` sum and a `pendingWhere` count per stage | Done (second pass) |
+| R11 | Add a copy button for the intake endpoint URL. | DX | `connections/intake/page.tsx` | `InputGroup` + `CopyValue` | Done (second pass) |
+| R12 | Add a way to discard or reject a proposal. | UX | API + `sales-workflow.tsx` | `sales.rejectProposal`, session only, reason required, enforced by database triggers | Done (second pass) |
 
 ---
 
@@ -462,23 +462,37 @@ Board render: `applyStageMoves` and `groupDealsByStage` each run once per render
 | Tests | `bun test` in `apps/app` against PostgreSQL 16 | 206 pass, 0 fail (6 runs) |
 | Browser | Playwright: sign in, board drag, sales create, import check, phone width, dark mode | PASS |
 
+## Second pass
+
+The second pass implements every open item above. Each line names the evidence.
+
+| Item | Outcome | Evidence |
+| --- | --- | --- |
+| Review inbox | Done | `sales.reviewQueue`, `sales_review_queue` MCP tool, `SalesReviewQueue` on the page. `sales-rejection.integration.spec.ts`, `sales-request-url.spec.tsx`, `mcp-bridge.spec.ts`. Browser: 3 rows, MCP and page counts agree. |
+| Reject a proposal | Done | `sales.rejectProposal`, migration `20261024150000_sales_proposal_rejection` (status `REJECTED`, audit columns, two check constraints, triggers extended). 8 integration tests. Browser: reject, then approve on another request. |
+| Board column totals | Done | `deals.stageValues`. `deal-stage-values.integration.spec.ts`. Browser totals equal a direct SQL sum of `baseAmount`. |
+| `Combobox` value | Done | `value={option.value}`, label and hint in `keywords`. |
+| Approval guarantee on phones | Done | Moved out of `CardDescription`. Browser at 390 px: visible. |
+| Dialog max height | Checked | Import, Add a connection and Close as lost: each dialog fits a 600 px or 420 px window, and its primary button is reachable. |
+| Pending poll limit | Done | `SALES_WORKFLOW.pollTimeoutMinutes`, "Check again" button. |
+| Intake copy button | Done | `#intake-endpoint` with `CopyValue`. |
+| `next build` | Done | Compiles. `/icon/*`, `/apple-icon` and the manifest prerender. |
+| Bun 1.3.12 | Done | `turbo run test --force` on 1.3.12: 1,622 pass, 0 fail. |
+| StartOS packaging | Done | Read-only audit against `ai-service-packaging` and SDK 2.0.9 types. Boilerplate equals `hello-world-startos` at `8484f70`. Ollama ids equal `Start9Labs/ollama-startos` at `a520a2a`. README fixes and `CONTRIBUTING.md`. |
+
 ## Issues
 
-1. NOT DONE — The sales page has no list of proposals that wait for review. A rep finds a proposal only by its ID or URL.
-   Fix: not done. Needs a `sales.reviewQueue` query, an MCP tool and a list on the page.
-2. NOT DONE — No action discards or rejects a proposal. A wrong proposal stays in PROPOSED.
-   Fix: not done. Needs `sales.rejectProposal` in the API.
-3. NOT DONE — Board columns show a count but no money total.
-   Fix: not done. Needs `baseAmount` per row, as `docs/currency.md` requires.
-4. RISK — The shared `Combobox` uses the label as the cmdk value. Two contacts with the same name share one highlight.
-   Fix: not done. Use the option id as the value and the label as a keyword.
-5. RISK — `CardDescription` is hidden below 640 px. The "nothing changes before approval" text is hidden on phones.
-   Fix: not done. Shared component behaviour. Needs a design decision.
-6. RISK — `DialogContent` now has a max height and an inner scroll for every dialog. A dialog that depends on overflow can clip.
-   Fix: checked "Add a connection" and "Import". Other dialogs not checked. I caused this.
-7. RISK — A pending sales request polls every 2 s with no upper limit while its tab is visible.
-   Fix: not done. Add a time limit and a message.
-8. UNKNOWN — `next build` was not run. The production bundle is not verified locally.
-   Fix: CI runs the build on the pull request.
-9. UNKNOWN — I tested on Bun 1.4.4. The repo pins Bun 1.3.12.
-   Fix: CI uses the pinned version.
+1. RISK — `crm-volume-owner` runs `chown -R` over all media on each start. Start time grows with the number of pictures.
+   Fix: not done. A `find`-based chown needs `find` in the image. Docker Hub refused the pull (429), so I could not verify it.
+2. UNKNOWN — `make x86` did not run locally. `start-cli` is not installed here.
+   Fix: the `StartOS package` workflow builds both architectures on the pull request.
+3. UNKNOWN — Start9's official guide at `docs.start9.com` returned 403 through the proxy.
+   Fix: the maintained guide in `ai-service-packaging` and the SDK types were the sources.
+4. UNKNOWN — The create-channel, new-agent and created-API-key dialogs were not opened in the browser after the max-height change.
+   Fix: not done. They use the same `DialogContent`.
+5. RISK — `README.md` in `deploy/startos` does not pass Prettier. It did not pass before this change either.
+   Fix: not done. `s9pk.mk` does not check Markdown.
+6. NOT DONE — The REST bridge is not exposed on StartOS. OpenAPI tool servers cannot reach `/rest`.
+   Fix: see `FOLLOWUPS.md` §C. It needs a second interface or a proxy route.
+7. NOT DONE — The manifest, the page title and the landing pages still say "Comp AI CRM".
+   Fix: needs the business name. Not guessed.
