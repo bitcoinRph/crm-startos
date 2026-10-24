@@ -16,6 +16,15 @@ import {
 	DescriptionTerm,
 } from "@crm/ui/components/description-list";
 import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@crm/ui/components/dialog";
+import {
 	Field,
 	FieldDescription,
 	FieldGroup,
@@ -46,11 +55,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "api/app-router";
 import { parseAsString, useQueryState } from "nuqs";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { z } from "zod";
 import { ContactPicker } from "@/components/crm/contact-picker";
 import { LocalDateTime } from "@/components/local-date-time";
 import { useTRPC } from "@/lib/trpc/client";
+import { SalesReviewQueue } from "./sales-review-queue";
 import { SALES_WORKFLOW } from "./sales-workflow-config";
 
 export type SalesRequest = inferRouterOutputs<AppRouter>["sales"]["getRequest"];
@@ -61,6 +71,7 @@ const STATUS = {
 	PENDING: { label: "Waiting for the agent", tone: "neutral", busy: true },
 	PROPOSED: { label: "Ready for your review", tone: "primary", busy: false },
 	APPROVED: { label: "Approved", tone: "success", busy: false },
+	REJECTED: { label: "Rejected", tone: "warning", busy: false },
 	FAILED: { label: "Failed", tone: "error", busy: false },
 } as const satisfies Record<
 	SalesStatus,
@@ -74,6 +85,13 @@ const OPERATION_LABEL = {
 } as const satisfies Record<SalesOperation["type"], string>;
 
 const DATE_TIME = { dateStyle: "medium", timeStyle: "short" } as const;
+
+function stalled(request: SalesRequest | undefined) {
+	return (
+		request?.status === "PENDING" &&
+		Date.now() - Date.parse(request.createdAt) > SALES_WORKFLOW.pollTimeoutMs
+	);
+}
 
 function fullName(person: { firstName: string; lastName: string | null }) {
 	return [person.firstName, person.lastName].filter(Boolean).join(" ");
@@ -124,7 +142,8 @@ function SalesWorkflowContent({
 				retry: false,
 				refetchInterval: (query) =>
 					!query.state.error &&
-					(!query.state.data || query.state.data.status === "PENDING")
+					(!query.state.data || query.state.data.status === "PENDING") &&
+					!stalled(query.state.data)
 						? SALES_WORKFLOW.pollIntervalMs
 						: false,
 			},
@@ -153,9 +172,28 @@ function SalesWorkflowContent({
 			},
 		}),
 	);
+	const reject = useMutation(
+		trpc.sales.rejectProposal.mutationOptions({
+			onSuccess: async () => {
+				await Promise.all([
+					queryClient.invalidateQueries({
+						queryKey: trpc.sales.getRequest.queryKey({ requestId }),
+					}),
+					queryClient.invalidateQueries({
+						queryKey: trpc.sales.reviewQueue.pathKey(),
+					}),
+				]);
+			},
+		}),
+	);
 	const active = !!requestId;
-	const busy = create.isPending || approve.isPending;
-	const error = create.error ?? approve.error ?? request.error ?? contact.error;
+	const busy = create.isPending || approve.isPending || reject.isPending;
+	const error =
+		create.error ??
+		approve.error ??
+		reject.error ??
+		request.error ??
+		contact.error;
 	const loaded = contact.data && contact.data.id === contactId;
 	const canSubmit =
 		revision.success &&
@@ -179,6 +217,9 @@ function SalesWorkflowContent({
 						Retry request status
 					</Button>
 				</div>
+			)}
+			{!active && (
+				<SalesReviewQueue activeId={requestId} onOpen={setRequestId} />
 			)}
 			{!active && (
 				<Card>
@@ -318,6 +359,9 @@ function SalesWorkflowContent({
 				<SalesRequestReview
 					request={request.data}
 					approving={approve.isPending || approve.isSuccess || request.isError}
+					rejecting={reject.isPending || reject.isSuccess || request.isError}
+					stalled={stalled(request.data)}
+					onCheckAgain={() => void request.refetch()}
 					onApprove={() => {
 						const proposal = request.data?.proposal;
 						if (proposal && !approve.isPending && !approve.isSuccess)
@@ -326,22 +370,35 @@ function SalesWorkflowContent({
 								idempotencyKey: proposal.idempotencyKey,
 							});
 					}}
+					onReject={(reason) => {
+						const proposal = request.data?.proposal;
+						if (proposal && !reject.isPending && !reject.isSuccess)
+							reject.mutate({
+								proposalId: proposal.id,
+								idempotencyKey: proposal.idempotencyKey,
+								reason,
+							});
+					}}
 				/>
 			)}
 			{active && (
 				<div>
 					<Button
 						variant="outline"
-						disabled={approve.isPending}
+						disabled={approve.isPending || reject.isPending}
 						onClick={() => {
 							setRequestId("");
 							create.reset();
 							approve.reset();
+							reject.reset();
 						}}
 					>
 						Start another request
 					</Button>
 				</div>
+			)}
+			{active && (
+				<SalesReviewQueue activeId={requestId} onOpen={setRequestId} />
 			)}
 			<form
 				className="flex flex-col gap-2 border-t pt-6"
@@ -394,19 +451,96 @@ function OperationTarget({ operation }: { operation: SalesOperation }) {
 	return <>On the contact timeline</>;
 }
 
+function RejectProposalDialog({
+	rejecting,
+	onReject,
+}: {
+	rejecting: boolean;
+	onReject: (reason: string) => void;
+}) {
+	const reasonId = useId();
+	const [open, setOpen] = useState(false);
+	const [reason, setReason] = useState("");
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger asChild>
+				<Button variant="outline" disabled={rejecting}>
+					Reject proposal
+				</Button>
+			</DialogTrigger>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Reject this proposal</DialogTitle>
+					<DialogDescription>
+						Nothing in the CRM changes. The proposal stays on record as
+						rejected, with your reason. You cannot undo this.
+					</DialogDescription>
+				</DialogHeader>
+				<form
+					id="sales-reject"
+					onSubmit={(event) => {
+						event.preventDefault();
+						if (!reason.trim()) return;
+						onReject(reason.trim());
+						setOpen(false);
+					}}
+				>
+					<Field>
+						<FieldLabel htmlFor={reasonId}>Reason</FieldLabel>
+						<Textarea
+							id={reasonId}
+							required
+							value={reason}
+							maxLength={SALES_WORKFLOW.rejectionReasonMaxLength}
+							onChange={(event) => setReason(event.target.value)}
+							placeholder="The note is about a different person."
+							rows={3}
+						/>
+					</Field>
+				</form>
+				<DialogFooter>
+					<Button variant="outline" onClick={() => setOpen(false)}>
+						Cancel
+					</Button>
+					<Button
+						type="submit"
+						form="sales-reject"
+						variant="destructive"
+						disabled={!reason.trim()}
+					>
+						Reject proposal
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export function SalesRequestReview({
 	request,
 	approving,
+	rejecting = false,
+	stalled = false,
 	onApprove,
+	onReject = () => {},
+	onCheckAgain = () => {},
 }: {
 	request: SalesRequest;
 	approving: boolean;
+	rejecting?: boolean;
+	stalled?: boolean;
 	onApprove: () => void;
+	onReject?: (reason: string) => void;
+	onCheckAgain?: () => void;
 }) {
 	const proposal = request.proposal;
 	const status = STATUS[request.status];
-	const canApprove =
-		!!proposal && request.status === "PROPOSED" && !proposal.approvedAt;
+	const canDecide =
+		!!proposal &&
+		request.status === "PROPOSED" &&
+		!proposal.approvedAt &&
+		!proposal.rejectedAt;
 
 	return (
 		<Card data-slot="sales-request" data-status={request.status}>
@@ -414,8 +548,7 @@ export function SalesRequestReview({
 				<CardTitle>Proposal for {fullName(request.contactSnapshot)}</CardTitle>
 				<CardDescription>
 					{request.contactSnapshot.email ?? "No email"} · Current title:{" "}
-					{request.contactSnapshot.title ?? "None"}. No CRM records change
-					before approval.
+					{request.contactSnapshot.title ?? "None"}
 				</CardDescription>
 				<CardAction>
 					<div role="status" aria-live="polite">
@@ -430,6 +563,9 @@ export function SalesRequestReview({
 			</CardHeader>
 			<CardContent>
 				<div className="flex flex-col gap-6">
+					<p className="text-muted-foreground text-sm">
+						No CRM records change before approval.
+					</p>
 					<section className="flex flex-col gap-2">
 						<h3 className="font-medium text-sm">Customer note</h3>
 						<blockquote className="whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-sm">
@@ -437,11 +573,29 @@ export function SalesRequestReview({
 						</blockquote>
 					</section>
 
-					{request.status === "PENDING" && (
+					{request.status === "PENDING" && !stalled && (
 						<p className="text-muted-foreground text-sm">
 							Waiting for an agent to file a proposal. No contact, note or task
 							changes while the request waits. This page updates by itself.
 						</p>
+					)}
+
+					{stalled && (
+						<Alert variant="warning">
+							<AlertTitle>
+								No proposal after {SALES_WORKFLOW.pollTimeoutMinutes} minutes
+							</AlertTitle>
+							<AlertDescription>
+								The page stopped checking. The processor that this profile names
+								is offline or busy. Check again, or start another request with a
+								different profile.
+							</AlertDescription>
+							<div>
+								<Button variant="outline" size="sm" onClick={onCheckAgain}>
+									Check again
+								</Button>
+							</div>
+						</Alert>
 					)}
 
 					{request.error && (
@@ -483,13 +637,26 @@ export function SalesRequestReview({
 						</section>
 					)}
 
-					{canApprove && (
-						<div>
-							<Button disabled={approving} onClick={onApprove}>
+					{canDecide && (
+						<div className="flex flex-wrap items-center gap-2">
+							<Button disabled={approving || rejecting} onClick={onApprove}>
 								{approving ? <Spinner data-icon="inline-start" /> : null}
 								{approving ? "Confirming approval…" : "Approve proposal"}
 							</Button>
+							<RejectProposalDialog
+								rejecting={approving || rejecting}
+								onReject={onReject}
+							/>
 						</div>
+					)}
+
+					{proposal?.rejectedAt && (
+						<p role="status" className="text-sm">
+							Rejected{" "}
+							<LocalDateTime date={proposal.rejectedAt} options={DATE_TIME} />.
+							No CRM record changed. Reason:{" "}
+							{proposal.rejectionReason ?? "None"}
+						</p>
 					)}
 
 					{proposal?.approvedAt && (

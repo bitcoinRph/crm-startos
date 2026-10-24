@@ -1562,6 +1562,7 @@ enum SalesRequestStatus {
   PENDING
   PROPOSED
   APPROVED
+  REJECTED
   FAILED
 }
 
@@ -1600,6 +1601,10 @@ model SalesProposal {
   approvedById String?
   approvedSessionId String?
   appliedActivityIds String[] @default([])
+  rejectedAt DateTime?
+  rejectedById String?
+  rejectedSessionId String?
+  rejectionReason String?
 
   @@map("salesProposal")
 }

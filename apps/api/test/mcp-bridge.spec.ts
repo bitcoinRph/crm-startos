@@ -31,7 +31,10 @@ import {
 	KEY_PERMISSIONS,
 } from "../src/api-keys/api-key-profiles";
 import { MCP_TOOLS } from "../src/mcp/mcp-tools";
-import { salesPendingOutput } from "../src/sales/sales.contracts";
+import {
+	salesPendingOutput,
+	salesReviewQueueOutput,
+} from "../src/sales/sales.contracts";
 import { SearchService } from "../src/search/search.service";
 
 const prefix = `mcp-${randomUUID()}`;
@@ -661,6 +664,7 @@ const existingProfileTools = {
 	crm_integration: [
 		"sales_get_request",
 		"sales_pending_requests",
+		"sales_review_queue",
 		"search_crm",
 		"whoami",
 		"list_users",
@@ -692,6 +696,7 @@ const existingProfileTools = {
 		"sales_create_request",
 		"sales_get_request",
 		"sales_pending_requests",
+		"sales_review_queue",
 		"sales_store_proposal",
 		"sales_fail_request",
 		"search_crm",
@@ -712,6 +717,7 @@ const existingProfileTools = {
 	agent_read: [
 		"sales_get_request",
 		"sales_pending_requests",
+		"sales_review_queue",
 		"search_crm",
 		"whoami",
 		"list_users",
@@ -863,6 +869,7 @@ describe("MCP profile discovery", () => {
 			],
 			["sales_get_request", { requestId }],
 			["sales_pending_requests", {}],
+			["sales_review_queue", {}],
 			[
 				"sales_store_proposal",
 				{
@@ -1038,7 +1045,11 @@ describe("MCP profile discovery", () => {
 			expect(tools.map((tool) => tool.name).sort()).toEqual(
 				profile === "legacy"
 					? []
-					: ["sales_get_request", "sales_pending_requests"],
+					: [
+							"sales_get_request",
+							"sales_pending_requests",
+							"sales_review_queue",
+						],
 			);
 			for (const tool of tools) {
 				const before = await ownedState();
@@ -1054,8 +1065,12 @@ describe("MCP profile discovery", () => {
 					expect(result.content[0]?.text).toStartWith("NOT_FOUND:");
 				} else {
 					expect(result.isError).not.toBe(true);
+					const output =
+						tool.name === "sales_review_queue"
+							? salesReviewQueueOutput
+							: salesPendingOutput;
 					expect(
-						salesPendingOutput.safeParse(
+						output.safeParse(
 							JSON.parse(z.string().parse(result.content[0]?.text)),
 						).success,
 					).toBe(true);

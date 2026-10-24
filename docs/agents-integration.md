@@ -100,7 +100,8 @@ key's profile applies exactly as it does in the browser.
 | Find and read records | `search_crm`, `list_contacts`, `get_contact`, `list_companies`, `get_company`, `list_deals`, `get_deal`, `timeline`, `my_tasks`, `dashboard_summary`, `whoami` | any |
 | Change a record | `create_contact`, `update_contact`, `create_company`, `update_company`, `create_deal`, `update_deal`, `set_deal_stage`, `attach_contact_to_deal`, `log_activity`, `complete_task`, `enrich_*` | `crm_integration` |
 | File a sales proposal | `sales_pending_requests`, `sales_get_request`, `sales_create_request`, `sales_store_proposal`, `sales_fail_request` | `agent_propose` |
-| Approve a proposal | none. Approval is a human click on **Sales** in the web app | — |
+| See what waits for review | `sales_review_queue` | any with sales or CRM read |
+| Approve or reject a proposal | none. A person approves or rejects on **Sales proposals** in the web app | — |
 
 A proposal must quote the request's source exactly; the server rejects anything
 else. Name your model in `producedBy`. The CRM records which key filed each
