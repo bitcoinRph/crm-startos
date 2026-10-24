@@ -9,7 +9,7 @@ The supported path is an external agent over MCP or REST with an `agent_propose`
 It reads `sales_pending_requests`, extracts with its own model, and stores the result with `sales_store_proposal`.
 It names its model in `producedBy`. The CRM records the key that stored every proposal (`proposedByKeyId`) and the key that created every request (`requestedByKeyId`).
 A request it cannot satisfy is closed with `sales_fail_request`.
-`apps/agent/agent/lib/sales-extraction.ts` extracts with the local Ollama profile, but no scheduler calls it. `apps/agent/test/e2e/sales-worker.e2e.ts` drives it by hand against one synthetic request. Unattended in-CRM extraction is a follow-up (`FOLLOWUPS.md`).
+`apps/agent/agent/lib/sales-extraction.ts` extracts with the local Ollama profile. The dispatch tick (`apps/agent/agent/schedules/dispatch.ts`) calls `drainSalesRequests()` every minute, which processes requests on the `crm-ollama` and `crm-codex` profiles (`apps/agent/agent/lib/sales-worker.ts`). `apps/agent/test/e2e/sales-worker.e2e.ts` still drives one synthetic request by hand.
 
 ## Contract
 

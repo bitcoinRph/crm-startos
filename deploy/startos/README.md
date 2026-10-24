@@ -68,7 +68,7 @@ make x86
 | `crm` | Built by the root `Dockerfile` from this repository: Node 24 with Bun, `bun install --frozen-lockfile`, `bun run build` | x86_64, aarch64 |
 | `postgres` | Official `postgres` image, 17 on Alpine | x86_64, aarch64 |
 
-Six daemons and two oneshots run from those two images, in this order:
+Five daemons and two oneshots run from those two images, in this order:
 
 | Name | Kind | Command | Purpose |
 | --- | --- | --- | --- |
@@ -97,7 +97,7 @@ One volume, `main`:
 
 ## Installation and First-Run Flow
 
-1. On install, `seedSecrets` generates the four secrets above.
+1. On install, `seedSecrets` generates the four secrets above. On install and on any start where it is missing, it also writes `secretsKey` (`CRM_SECRETS_KEY`), the key that seals Codex credentials.
 2. `watchAdminCredentials` raises a critical task pointing at **Set Sign-in Credentials** while no password account is stored. The service cannot start until it is run.
 3. On every start `main.ts` composes the environment from the store and the service's own addresses, runs the migrations, applies the password account, then starts the API, the app, the agent and the scheduler.
 4. The first person to sign in becomes the workspace owner, as upstream; the web app then runs its own onboarding for the workspace name and website.
@@ -209,7 +209,7 @@ volumes:
 ports:
   ui: 3000
   mcp: 3000 (/api/mcp)
-dependencies: none
+dependencies: ollama (optional; required only while Configure Local Inference names a model)
 startos_managed_env_vars:
   - NODE_ENV
   - DATABASE_URL
