@@ -3,6 +3,8 @@ import net from "node:net";
 
 const MAX_REDIRECTS = 3;
 
+export type PinnedFetchInit = RequestInit & { tls?: { serverName: string } };
+
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 export function isBlockedAddress(ip: string): boolean {
@@ -85,17 +87,22 @@ function expandIPv6(ip: string): number[] | null {
 	return groups;
 }
 
-export async function resolvesToPublicHost(
+export const safeFetchTransport = {
+	lookup: (hostname: string) => dns.lookup(hostname, { all: true }),
+	fetch: (url: URL, init: PinnedFetchInit) => fetch(url, init),
+};
+
+async function resolvePublicAddresses(
 	hostname: string,
-	timeoutMs: number = DEFAULT_TIMEOUT_MS,
-): Promise<boolean> {
+	timeoutMs: number,
+): Promise<string[] | null> {
 	const literal = hostname.replace(/^\[|\]$/g, "");
-	if (net.isIP(literal)) return !isBlockedAddress(literal);
+	if (net.isIP(literal)) return isBlockedAddress(literal) ? null : [literal];
 
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	try {
 		const addresses = await Promise.race([
-			dns.lookup(hostname, { all: true }),
+			safeFetchTransport.lookup(hostname),
 			new Promise<never>((_, reject) => {
 				timer = setTimeout(
 					() => reject(new Error(`${hostname} did not resolve in time`)),
@@ -104,15 +111,35 @@ export async function resolvesToPublicHost(
 			}),
 		]);
 
-		return (
-			addresses.length > 0 &&
+		return addresses.length > 0 &&
 			addresses.every((address) => !isBlockedAddress(address.address))
-		);
+			? addresses.map((address) => address.address)
+			: null;
 	} catch {
-		return false;
+		return null;
 	} finally {
 		clearTimeout(timer);
 	}
+}
+
+export async function resolvesToPublicHost(
+	hostname: string,
+	timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<boolean> {
+	return (await resolvePublicAddresses(hostname, timeoutMs)) !== null;
+}
+
+function pinTo(target: URL, address: string): PinnedFetchInit & { url: URL } {
+	const url = new URL(target);
+	url.hostname = net.isIPv6(address) ? `[${address}]` : address;
+	return {
+		url,
+		headers: { host: target.host },
+		tls:
+			target.protocol === "https:"
+				? { serverName: target.hostname }
+				: undefined,
+	};
 }
 
 export async function safeFetch(
@@ -137,22 +164,30 @@ export async function safeFetch(
 	for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
 		if (target.protocol !== "https:" && target.protocol !== "http:")
 			return null;
-		if (!(await resolvesToPublicHost(target.hostname, timeoutMs))) return null;
+		const addresses = await resolvePublicAddresses(target.hostname, timeoutMs);
+		if (!addresses) return null;
 
-		let response: Response;
-		try {
-			response = await fetch(target, {
-				method,
-				signal: AbortSignal.timeout(timeoutMs),
-				redirect: "manual",
-				headers: {
-					"user-agent": "Mozilla/5.0 (compatible; CRM/1.0)",
-					...headers,
-				},
-			});
-		} catch {
-			return null;
+		const isLiteral = net.isIP(target.hostname.replace(/^\[|\]$/g, "")) !== 0;
+		const signal = AbortSignal.timeout(timeoutMs);
+		let response: Response | null = null;
+		for (const address of isLiteral ? [null] : addresses) {
+			const pinned = address ? pinTo(target, address) : null;
+			try {
+				response = await safeFetchTransport.fetch(pinned?.url ?? target, {
+					method,
+					signal,
+					redirect: "manual",
+					tls: pinned?.tls,
+					headers: {
+						"user-agent": "Mozilla/5.0 (compatible; CRM/1.0)",
+						...headers,
+						...pinned?.headers,
+					},
+				});
+				break;
+			} catch {}
 		}
+		if (!response) return null;
 
 		const location = response.headers.get("location");
 		if (response.status >= 300 && response.status < 400 && location) {
