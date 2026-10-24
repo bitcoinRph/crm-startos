@@ -25,6 +25,7 @@ describe("API key profiles in the settings UI", () => {
 			"crm_integration",
 			"agent_propose",
 			"agent_read",
+			"intake",
 		]);
 	});
 

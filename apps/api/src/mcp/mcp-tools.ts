@@ -195,6 +195,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description: "Mark a task done, or reopen it with completed set to false.",
 	},
 	{
+		name: "intake_submit",
+		procedure: "intake.submit",
+		description:
+			"File a lead. Pass an email and, if known, a name, company name or domain, a message and a short source label such as website-form. Finds the contact by email or creates it, logs the message as a note and queues research in the background. Returns the contact id and whether it was created, or status suppressed for an address a rep deleted. This is the only tool a key with the intake profile can call.",
+	},
+	{
 		name: "list_fields",
 		procedure: "fields.list",
 		description:

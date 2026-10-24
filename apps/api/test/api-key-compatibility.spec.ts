@@ -122,6 +122,44 @@ describe("API key access policy", () => {
 		);
 	});
 
+	it("lets an intake profile submit a lead and nothing else", () => {
+		const key = scoped(KEY_PERMISSIONS.intake);
+		expect(authorizeApiKeyProcedure(key, "intake.submit", "mutation")).toBe(
+			"allow",
+		);
+		for (const [path, type] of [
+			["contacts.list", "query"],
+			["contacts.byId", "query"],
+			["contacts.create", "mutation"],
+			["contacts.update", "mutation"],
+			["activities.create", "mutation"],
+			["search.quick", "query"],
+			["apiKeys.list", "query"],
+		] as const) {
+			expect(authorizeApiKeyProcedure(key, path, type)).toBe("deny");
+		}
+	});
+
+	it("keeps intake submission away from the read-only and propose profiles", () => {
+		for (const profile of ["agent_read", "agent_propose"] as const) {
+			expect(
+				authorizeApiKeyProcedure(
+					scoped(KEY_PERMISSIONS[profile]),
+					"intake.submit",
+					"mutation",
+				),
+			).toBe("deny");
+		}
+	});
+
+	it("lets the integration and legacy keys submit a lead", () => {
+		for (const key of [scoped(KEY_PERMISSIONS.crm_integration), legacy]) {
+			expect(authorizeApiKeyProcedure(key, "intake.submit", "mutation")).toBe(
+				"allow",
+			);
+		}
+	});
+
 	it("delegates every sales procedure to the sales scopes", () => {
 		for (const key of [legacy, scoped(KEY_PERMISSIONS.crm_integration)]) {
 			expect(authorizeApiKeyProcedure(key, "sales.getRequest", "query")).toBe(

@@ -47,6 +47,8 @@ export function authorizeApiKeyProcedure(
 	if (path.startsWith("codex.")) return "deny";
 	if (PURGE_PROCEDURE.test(path)) return "deny";
 	if (key.permissions === null) return "allow";
+	if (path === "intake.submit" && permits(key.permissions, "intake", "write"))
+		return "allow";
 	return permits(key.permissions, "crm", type === "query" ? "read" : "write")
 		? "allow"
 		: "deny";

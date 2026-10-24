@@ -4,6 +4,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { domainFromEmail } from "./domain";
 
+type CompanyDirectoryOptions = {
+	ownerId?: string | null;
+	name?: string | null;
+};
+
 @Injectable()
 export class CompanyDirectoryService {
 	private readonly logger = new Logger(CompanyDirectoryService.name);
@@ -12,11 +17,16 @@ export class CompanyDirectoryService {
 
 	async companyForEmail(
 		email: string,
-		options: { ownerId?: string | null } = {},
+		options: CompanyDirectoryOptions = {},
 	): Promise<string | null> {
 		const domain = domainFromEmail(email);
-		if (!domain) return null;
+		return domain ? this.companyForDomain(domain, options) : null;
+	}
 
+	async companyForDomain(
+		domain: string,
+		options: CompanyDirectoryOptions = {},
+	): Promise<string> {
 		const outcome = await this.agent.withCrmEvents(async (tx, emit) => {
 			await lockIdempotencyKey(tx, `company-directory:${domain}`);
 			const existing = await tx.company.findFirst({
@@ -27,7 +37,7 @@ export class CompanyDirectoryService {
 
 			const company = await tx.company.create({
 				data: {
-					name: domain,
+					name: options.name ?? domain,
 					domain,
 					website: `https://${domain}`,
 					enrichmentStatus: EnrichmentStatus.PENDING,

@@ -78,7 +78,7 @@ export function AddConnectionDialog({
 					<CatalogRow
 						logo={Plug}
 						name="Anything else"
-						description="The intake API is not available yet"
+						description="Send leads from forms and automations with an API key"
 						href={`/${slug}/settings/connections/intake`}
 					/>
 				</div>

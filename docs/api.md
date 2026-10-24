@@ -251,6 +251,7 @@ from the stored permissions, never from the request.
 | `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can, except purge |
 | `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
 | `agent_read` | `crm:read` | Queries only |
+| `intake` | `intake:write` | Call `intake.submit` and nothing else |
 
 - **A query needs `crm:read`; a mutation needs `crm:write`.** The `sales.*`
   procedures decide from the `sales` permissions instead (`sales/sales.auth.ts`):
@@ -266,6 +267,26 @@ from the stored permissions, never from the request.
 - **Each key is rate-limited.** `API_KEY_RATE_LIMIT` in `packages/auth/src/api-key-config.ts` allows 3,000 key checks per 60 s per key, and one tRPC or MCP call makes two checks. The count resets only after the key is idle for longer than the window, so a continuously busy agent can be paused for up to 60 s. A key over the limit gets `429` or `TOO_MANY_REQUESTS`, and other keys are not affected. Better Auth stores the numbers on each key row at creation, so changing them needs a migration that updates the `apikey` rows.
 - **`Authorization: Bearer crm_…` is accepted everywhere**, not only on the MCP
   endpoint. `keyFromHeaders` normalises it before the session is resolved.
+
+## Inbound intake is one mutation behind a narrow key
+
+`intake.submit` (`src/intake/`) files a lead from a form, an automation or a payment
+hook. Only the web origin is exposed on StartOS, so it is a tRPC mutation reached at
+`POST /api/trpc/intake.submit` with `Authorization: Bearer crm_…` and a plain JSON body.
+The `intake` key profile holds `intake:write` and nothing else, so a key pasted into a
+third-party handler can create leads but cannot read or change the CRM.
+`crm_integration` and legacy keys can also call it. The MCP tool is `intake_submit`.
+
+- **The email is the identity.** It goes through `normalizeEmail`. An existing contact,
+  archived or not, is reused and gets one more note. A new one has `source` `INTAKE`.
+- **A suppressed address or domain creates nothing.** The answer is `status: "suppressed"`
+  with no contact id. Unlike `contacts.create`, intake never clears a suppression.
+- **A new contact queues the agent.** `AgentTriggerService.contactCreated` writes the
+  `identify` task and `contact.created` event. The API does no enrichment.
+- **The key stays on a server.** Do not put it in browser JavaScript. Anyone who reads the
+  page can then create leads, up to the per-key rate limit.
+- **The note carries the message.** `meta` holds `source: "intake"` and the caller's
+  `source` label. Every length limit is in `intake/intake-config.ts`.
 
 ## Two mail providers, one pipeline
 
