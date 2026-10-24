@@ -35,6 +35,9 @@
 
 ## Downloading and Building the `.s9pk`
 
+Package `1.19.0:1` changes only the StartOS package logo. It uses the approved symmetric SVG without modification.
+Application behavior, migrations, credentials, and backups remain unchanged.
+
 Built packages are published on the repository's [Releases](https://github.com/bitcoinRph/crm-startos/releases) page, one release per package version, tagged `startos-v<version>` with the colon written as a hyphen. Each release carries both architectures and a `checksums.txt`:
 
 | File | Server |
