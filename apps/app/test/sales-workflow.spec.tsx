@@ -89,6 +89,22 @@ describe("fixed sales workflow review", () => {
 		expect(html).toContain("jobTitle");
 		expect(html).toContain("Approve proposal");
 	});
+	it("labels each status in words and keeps the raw status for automation", () => {
+		const labels = {
+			PENDING: "Waiting for the agent",
+			PROPOSED: "Ready for your review",
+			APPROVED: "Approved",
+			FAILED: "Failed",
+		} as const;
+		for (const [status, label] of Object.entries(labels)) {
+			const html = render({
+				...request,
+				status: status as SalesRequest["status"],
+			});
+			expect(html).toContain(label);
+			expect(html).toContain(`data-status="${status}"`);
+		}
+	});
 	it("shows worker errors without an approval action", () => {
 		const html = render({
 			...request,

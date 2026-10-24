@@ -14,6 +14,7 @@ const textareaVariants = cva(
 			size: {
 				default: "min-h-16",
 				sm: "min-h-8",
+				bounded: "max-h-64 min-h-24 overflow-y-auto",
 				composer: "max-h-40 min-h-6",
 			},
 		},

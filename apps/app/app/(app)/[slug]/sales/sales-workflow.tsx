@@ -1,10 +1,10 @@
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@crm/ui/components/alert";
-import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
+	CardAction,
 	CardContent,
 	CardDescription,
 	CardHeader,
@@ -30,10 +30,16 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@crm/ui/components/select";
+import { Spinner } from "@crm/ui/components/spinner";
+import {
+	StatusIndicator,
+	type StatusTone,
+} from "@crm/ui/components/status-indicator";
 import { Textarea } from "@crm/ui/components/textarea";
 import {
 	approvedSalesProfile,
 	SALES_PROFILES,
+	type SalesOperation,
 	type SalesProfile,
 } from "@crm/validation/sales";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -42,11 +48,36 @@ import type { AppRouter } from "api/app-router";
 import { parseAsString, useQueryState } from "nuqs";
 import { useState } from "react";
 import { z } from "zod";
+import { ContactPicker } from "@/components/crm/contact-picker";
+import { LocalDateTime } from "@/components/local-date-time";
 import { useTRPC } from "@/lib/trpc/client";
 import { SALES_WORKFLOW } from "./sales-workflow-config";
 
 export type SalesRequest = inferRouterOutputs<AppRouter>["sales"]["getRequest"];
+type SalesStatus = SalesRequest["status"];
 const contactRevision = z.object({ updatedAt: z.iso.datetime() });
+
+const STATUS = {
+	PENDING: { label: "Waiting for the agent", tone: "neutral", busy: true },
+	PROPOSED: { label: "Ready for your review", tone: "primary", busy: false },
+	APPROVED: { label: "Approved", tone: "success", busy: false },
+	FAILED: { label: "Failed", tone: "error", busy: false },
+} as const satisfies Record<
+	SalesStatus,
+	{ label: string; tone: StatusTone; busy: boolean }
+>;
+
+const OPERATION_LABEL = {
+	contact_fact: "Update a contact field",
+	create_note: "Add a note",
+	create_task: "Add a task",
+} as const satisfies Record<SalesOperation["type"], string>;
+
+const DATE_TIME = { dateStyle: "medium", timeStyle: "short" } as const;
+
+function fullName(person: { firstName: string; lastName: string | null }) {
+	return [person.firstName, person.lastName].filter(Boolean).join(" ");
+}
 
 export function SalesWorkflow() {
 	const [requestId, setRequestId] = useQueryState(
@@ -71,15 +102,17 @@ function SalesWorkflowContent({
 }) {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
-	const [contactId, setContactId] = useState("");
+	const [contactId, setContactId] = useQueryState(
+		"contactId",
+		parseAsString.withDefault(""),
+	);
 	const [profile, setProfile] = useState<SalesProfile>(approvedSalesProfile);
-	const [selectedId, setSelectedId] = useState("");
 	const [source, setSource] = useState("");
 	const [requestToOpen, setRequestToOpen] = useState("");
 	const contact = useQuery(
 		trpc.contacts.byId.queryOptions(
-			{ id: selectedId },
-			{ enabled: !!selectedId, retry: false },
+			{ id: contactId },
+			{ enabled: !!contactId, retry: false },
 		),
 	);
 	const revision = contactRevision.safeParse(contact.data);
@@ -121,76 +154,54 @@ function SalesWorkflowContent({
 		}),
 	);
 	const active = !!requestId;
+	const busy = create.isPending || approve.isPending;
 	const error = create.error ?? approve.error ?? request.error ?? contact.error;
+	const loaded = contact.data && contact.data.id === contactId;
+	const canSubmit =
+		revision.success &&
+		!!loaded &&
+		!contact.data?.archivedAt &&
+		!!source.trim() &&
+		!contact.isFetching &&
+		!create.isPending;
+
 	return (
-		<div className="flex flex-col gap-6">
-			<Alert>
-				<AlertTitle>Evidence-backed proposals</AlertTitle>
-				<AlertDescription>
-					Paste one customer note for one contact. An agent holding a propose
-					key files a job title, a note, or a task quoted from that note. No CRM
-					record changes before you approve it here.
-				</AlertDescription>
-			</Alert>
+		<div className="flex max-w-3xl flex-col gap-6">
 			{error && (
-				<Alert variant="destructive">
-					<AlertTitle>API error</AlertTitle>
+				<Alert variant="destructive" role="alert">
+					<AlertTitle>The CRM refused the request</AlertTitle>
 					<AlertDescription>{error.message}</AlertDescription>
 				</Alert>
 			)}
 			{request.error && (
-				<Button variant="outline" onClick={() => void request.refetch()}>
-					Retry request status
-				</Button>
-			)}
-			<form
-				onSubmit={(event) => {
-					event.preventDefault();
-					if (!requestToOpen || create.isPending || approve.isPending) return;
-					setRequestId(requestToOpen);
-				}}
-			>
-				<FieldGroup>
-					<Field>
-						<FieldLabel htmlFor="sales-open-request">Request ID</FieldLabel>
-						<Input
-							id="sales-open-request"
-							required
-							value={requestToOpen}
-							onChange={(event) => setRequestToOpen(event.target.value)}
-							disabled={create.isPending || approve.isPending}
-						/>
-					</Field>
-					<Button
-						type="submit"
-						variant="outline"
-						disabled={!requestToOpen || create.isPending || approve.isPending}
-					>
-						Open request
+				<div>
+					<Button variant="outline" onClick={() => void request.refetch()}>
+						Retry request status
 					</Button>
-				</FieldGroup>
-			</form>
+				</div>
+			)}
 			{!active && (
 				<Card>
 					<CardHeader>
 						<CardTitle>Prepare a proposal</CardTitle>
 						<CardDescription>
-							Choose the contact, confirm its current revision, then paste the
-							note.
+							Choose one contact and paste one customer note. An agent proposes
+							a job title, a note or a task, quoted from that note. Nothing in
+							the CRM changes until you approve it.
 						</CardDescription>
+						<CardAction>
+							<Button type="submit" form="sales-prepare" disabled={!canSubmit}>
+								{create.isPending ? <Spinner data-icon="inline-start" /> : null}
+								Create proposal request
+							</Button>
+						</CardAction>
 					</CardHeader>
 					<CardContent>
 						<form
+							id="sales-prepare"
 							onSubmit={(event) => {
 								event.preventDefault();
-								if (
-									!revision.success ||
-									selectedId !== contactId ||
-									!contact.data ||
-									contact.data.archivedAt ||
-									create.isPending
-								)
-									return;
+								if (!canSubmit || !revision.success || !contact.data) return;
 								create.mutate({
 									source,
 									candidateIds: [contact.data.id],
@@ -202,9 +213,75 @@ function SalesWorkflowContent({
 						>
 							<FieldGroup>
 								<Field>
-									<FieldLabel htmlFor="sales-profile">
-										Inference profile
-									</FieldLabel>
+									<FieldLabel htmlFor="sales-contact">Contact</FieldLabel>
+									<ContactPicker
+										id="sales-contact"
+										value={contactId}
+										disabled={create.isPending}
+										selected={
+											loaded && contact.data
+												? {
+														value: contact.data.id,
+														label: fullName(contact.data),
+														hint: contact.data.email ?? undefined,
+													}
+												: undefined
+										}
+										onValueChange={(id) => {
+											create.reset();
+											void setContactId(id || null);
+										}}
+									/>
+									<FieldDescription aria-live="polite">
+										{!contactId ? (
+											"Search by name or email. The CRM does no automatic customer matching."
+										) : contact.isFetching ? (
+											<span className="inline-flex items-center gap-2">
+												<Spinner />
+												Loading the contact…
+											</span>
+										) : loaded && contact.data ? (
+											`${contact.data.email ?? "No email"} · Current title: ${contact.data.title ?? "None"}.`
+										) : null}
+									</FieldDescription>
+									{loaded && !revision.success && (
+										<Alert variant="destructive">
+											<AlertDescription>
+												The contact API does not provide a valid current
+												revision. Submission is disabled.
+											</AlertDescription>
+										</Alert>
+									)}
+									{loaded && contact.data?.archivedAt && (
+										<Alert variant="destructive">
+											<AlertDescription>
+												This contact is archived. Choose an active contact.
+											</AlertDescription>
+										</Alert>
+									)}
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="sales-source">Customer note</FieldLabel>
+									<Textarea
+										id="sales-source"
+										required
+										maxLength={SALES_WORKFLOW.sourceMaxLength}
+										rows={6}
+										value={source}
+										disabled={create.isPending}
+										onChange={(event) => setSource(event.target.value)}
+										placeholder="Spoke with Dana today. She is now Head of Procurement and wants a call on Friday."
+									/>
+									<FieldDescription>
+										Every proposed value must quote exact text from this note.{" "}
+										<span className="tabular-nums">
+											{source.length} of {SALES_WORKFLOW.sourceMaxLength}{" "}
+											characters.
+										</span>
+									</FieldDescription>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="sales-profile">Processed by</FieldLabel>
 									<Select
 										value={profile.id}
 										onValueChange={(id) =>
@@ -216,118 +293,22 @@ function SalesWorkflowContent({
 										disabled={create.isPending}
 									>
 										<SelectTrigger id="sales-profile">
-											<SelectValue>
-												{profile.id} / {profile.revision}
-											</SelectValue>
+											<SelectValue>{profile.label}</SelectValue>
 										</SelectTrigger>
 										<SelectContent>
 											<SelectGroup>
 												{SALES_PROFILES.map((entry) => (
 													<SelectItem key={entry.id} value={entry.id}>
-														{entry.id} / {entry.revision}
+														{entry.label}
 													</SelectItem>
 												))}
 											</SelectGroup>
 										</SelectContent>
 									</Select>
-									<FieldDescription>{profile.label}.</FieldDescription>
-								</Field>
-								<Field>
-									<FieldLabel htmlFor="sales-contact">Contact ID</FieldLabel>
-									<Input
-										id="sales-contact"
-										required
-										value={contactId}
-										disabled={create.isPending}
-										onChange={(event) => {
-											setContactId(event.target.value);
-											setSelectedId("");
-											create.reset();
-										}}
-									/>
 									<FieldDescription>
-										Copy the exact contact ID from the CRM. No automatic
-										customer matching.
+										Profile {profile.id} / {profile.revision}.
 									</FieldDescription>
 								</Field>
-								<Button
-									type="button"
-									variant="outline"
-									disabled={
-										!contactId || contact.isFetching || create.isPending
-									}
-									onClick={() => {
-										create.reset();
-										if (selectedId === contactId) void contact.refetch();
-										else setSelectedId(contactId);
-									}}
-								>
-									{contact.isFetching
-										? "Loading contact…"
-										: "Load contact revision"}
-								</Button>
-								{contact.data && selectedId === contactId && (
-									<Field>
-										<FieldLabel htmlFor="sales-revision">
-											Expected current contact revision
-										</FieldLabel>
-										<Input
-											id="sales-revision"
-											readOnly
-											value={revision.success ? revision.data.updatedAt : ""}
-										/>
-										<FieldDescription>
-											Customer: {contact.data.firstName} {contact.data.lastName}{" "}
-											· {contact.data.email} · {contact.data.id}. Current title:{" "}
-											{contact.data.title ?? "None"}.
-										</FieldDescription>
-										{!revision.success && (
-											<Alert variant="destructive">
-												<AlertDescription>
-													The contact API does not provide a valid current
-													revision. Submission is disabled.
-												</AlertDescription>
-											</Alert>
-										)}
-										{contact.data.archivedAt && (
-											<Alert variant="destructive">
-												<AlertDescription>
-													This contact is archived. Select an active contact.
-												</AlertDescription>
-											</Alert>
-										)}
-									</Field>
-								)}
-								<Field>
-									<FieldLabel htmlFor="sales-source">Customer note</FieldLabel>
-									<Textarea
-										id="sales-source"
-										required
-										maxLength={SALES_WORKFLOW.sourceMaxLength}
-										rows={6}
-										value={source}
-										disabled={create.isPending}
-										onChange={(event) => setSource(event.target.value)}
-									/>
-									<FieldDescription>
-										Evidence and proposed values must match exact text from this
-										note.
-									</FieldDescription>
-								</Field>
-								<Button
-									type="submit"
-									disabled={
-										!revision.success ||
-										selectedId !== contactId ||
-										!contact.data ||
-										!!contact.data.archivedAt ||
-										!source.trim() ||
-										contact.isFetching ||
-										create.isPending
-									}
-								>
-									{create.isPending ? "Submitting…" : "Create proposal request"}
-								</Button>
 							</FieldGroup>
 						</form>
 					</CardContent>
@@ -348,21 +329,69 @@ function SalesWorkflowContent({
 				/>
 			)}
 			{active && (
-				<Button
-					variant="outline"
-					disabled={approve.isPending}
-					onClick={() => {
-						setRequestId("");
-						setSelectedId("");
-						create.reset();
-						approve.reset();
-					}}
-				>
-					Start another request
-				</Button>
+				<div>
+					<Button
+						variant="outline"
+						disabled={approve.isPending}
+						onClick={() => {
+							setRequestId("");
+							create.reset();
+							approve.reset();
+						}}
+					>
+						Start another request
+					</Button>
+				</div>
 			)}
+			<form
+				className="flex flex-col gap-2 border-t pt-6"
+				onSubmit={(event) => {
+					event.preventDefault();
+					if (!requestToOpen.trim() || busy) return;
+					setRequestId(requestToOpen.trim());
+				}}
+			>
+				<Field>
+					<FieldLabel htmlFor="sales-open-request">
+						Open a request by its ID
+					</FieldLabel>
+					<div className="flex items-center gap-2">
+						<Input
+							id="sales-open-request"
+							required
+							value={requestToOpen}
+							onChange={(event) => setRequestToOpen(event.target.value)}
+							disabled={busy}
+							placeholder="00000000-0000-4000-8000-000000000000"
+							autoComplete="off"
+							spellCheck={false}
+						/>
+						<Button
+							type="submit"
+							variant="outline"
+							disabled={!requestToOpen.trim() || busy}
+						>
+							Open request
+						</Button>
+					</div>
+					<FieldDescription>
+						An agent returns this ID when it files a request. A link with
+						?requestId= opens the same view.
+					</FieldDescription>
+				</Field>
+			</form>
 		</div>
 	);
+}
+
+function OperationTarget({ operation }: { operation: SalesOperation }) {
+	if (operation.type === "contact_fact")
+		return (
+			<>
+				Field <span className="font-mono">{operation.field}</span>
+			</>
+		);
+	return <>On the contact timeline</>;
 }
 
 export function SalesRequestReview({
@@ -375,109 +404,142 @@ export function SalesRequestReview({
 	onApprove: () => void;
 }) {
 	const proposal = request.proposal;
+	const status = STATUS[request.status];
+	const canApprove =
+		!!proposal && request.status === "PROPOSED" && !proposal.approvedAt;
+
 	return (
-		<Card>
+		<Card data-slot="sales-request" data-status={request.status}>
 			<CardHeader>
-				<CardTitle>Proposal review</CardTitle>
+				<CardTitle>Proposal for {fullName(request.contactSnapshot)}</CardTitle>
 				<CardDescription>
-					No CRM records change before approval.
+					{request.contactSnapshot.email ?? "No email"} · Current title:{" "}
+					{request.contactSnapshot.title ?? "None"}. No CRM records change
+					before approval.
 				</CardDescription>
+				<CardAction>
+					<div role="status" aria-live="polite">
+						<StatusIndicator
+							size="sm"
+							tone={status.tone}
+							busy={status.busy}
+							label={status.label}
+						/>
+					</div>
+				</CardAction>
 			</CardHeader>
 			<CardContent>
-				<div className="flex flex-col gap-4">
-					<div role="status">
-						Status: <Badge variant="outline">{request.status}</Badge>
-					</div>
-					<DescriptionList>
-						<DescriptionTerm>Request ID</DescriptionTerm>
-						<DescriptionDetails>{request.id}</DescriptionDetails>
-						<DescriptionTerm>Customer</DescriptionTerm>
-						<DescriptionDetails>
-							{request.contactSnapshot.firstName}{" "}
-							{request.contactSnapshot.lastName} ·{" "}
-							{request.contactSnapshot.email}
-						</DescriptionDetails>
-						<DescriptionTerm>Contact ID</DescriptionTerm>
-						<DescriptionDetails>{request.contactId}</DescriptionDetails>
-						<DescriptionTerm>Expected contact revision</DescriptionTerm>
-						<DescriptionDetails>{request.expectedUpdatedAt}</DescriptionDetails>
-						<DescriptionTerm>Current title at request</DescriptionTerm>
-						<DescriptionDetails>
-							{request.contactSnapshot.title ?? "None"}
-						</DescriptionDetails>
-						<DescriptionTerm>Contract</DescriptionTerm>
-						<DescriptionDetails>
-							{request.profileId} / {request.profileRevision}
-						</DescriptionDetails>
-						<DescriptionTerm>Requested with</DescriptionTerm>
-						<DescriptionDetails>
-							{request.requestedByKeyId
-								? `API key ${request.requestedByKeyId}`
-								: "Browser session"}
-						</DescriptionDetails>
-						<DescriptionTerm>Exact source</DescriptionTerm>
-						<DescriptionDetails>{request.source}</DescriptionDetails>
-					</DescriptionList>
+				<div className="flex flex-col gap-6">
+					<section className="flex flex-col gap-2">
+						<h3 className="font-medium text-sm">Customer note</h3>
+						<blockquote className="whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-sm">
+							{request.source}
+						</blockquote>
+					</section>
+
 					{request.status === "PENDING" && (
-						<p role="status">
-							Waiting for an agent to file a proposal. No contact, note, or task
-							changes while pending.
+						<p className="text-muted-foreground text-sm">
+							Waiting for an agent to file a proposal. No contact, note or task
+							changes while the request waits. This page updates by itself.
 						</p>
 					)}
+
 					{request.error && (
 						<Alert variant="destructive">
 							<AlertTitle>Agent error</AlertTitle>
 							<AlertDescription>{request.error}</AlertDescription>
 						</Alert>
 					)}
-					{proposal?.operations.map((operation) => (
-						<Card key={operation.type}>
-							<CardHeader>
-								<CardTitle>{operation.type}</CardTitle>
-								<CardDescription>
-									Contact ID: {operation.contactId} · Field:{" "}
-									{operation.field ?? "None"}
-								</CardDescription>
-							</CardHeader>
-							<CardContent>
-								<DescriptionList>
-									<DescriptionTerm>Exact value</DescriptionTerm>
-									<DescriptionDetails>{operation.value}</DescriptionDetails>
-									<DescriptionTerm>Exact evidence</DescriptionTerm>
-									<DescriptionDetails>{operation.evidence}</DescriptionDetails>
-								</DescriptionList>
-							</CardContent>
-						</Card>
-					))}
-					{proposal && (
-						<DescriptionList>
-							<DescriptionTerm>Proposal ID</DescriptionTerm>
-							<DescriptionDetails>{proposal.id}</DescriptionDetails>
-							<DescriptionTerm>Produced by</DescriptionTerm>
-							<DescriptionDetails>
-								{proposal.producedBy ?? "Unknown"}
-							</DescriptionDetails>
-							<DescriptionTerm>Filed with</DescriptionTerm>
-							<DescriptionDetails>
-								{proposal.proposedByKeyId
-									? `API key ${proposal.proposedByKeyId}`
-									: "Browser session"}
-							</DescriptionDetails>
-						</DescriptionList>
+
+					{proposal && proposal.operations.length > 0 && (
+						<section className="flex flex-col gap-2">
+							<h3 className="font-medium text-sm">Proposed changes</h3>
+							<ol className="flex flex-col gap-2">
+								{proposal.operations.map((operation) => (
+									<li
+										key={`${operation.type}-${operation.value}`}
+										data-operation={operation.type}
+										className="flex flex-col gap-2 rounded-lg border p-3"
+									>
+										<div className="flex flex-wrap items-baseline justify-between gap-2">
+											<span className="font-medium text-sm">
+												{OPERATION_LABEL[operation.type]}
+											</span>
+											<span className="text-muted-foreground text-xs">
+												<OperationTarget operation={operation} />
+											</span>
+										</div>
+										<DescriptionList>
+											<DescriptionTerm>Exact value</DescriptionTerm>
+											<DescriptionDetails>{operation.value}</DescriptionDetails>
+											<DescriptionTerm>Exact evidence</DescriptionTerm>
+											<DescriptionDetails>
+												{operation.evidence}
+											</DescriptionDetails>
+										</DescriptionList>
+									</li>
+								))}
+							</ol>
+						</section>
 					)}
-					{proposal &&
-						request.status === "PROPOSED" &&
-						!proposal.approvedAt && (
+
+					{canApprove && (
+						<div>
 							<Button disabled={approving} onClick={onApprove}>
+								{approving ? <Spinner data-icon="inline-start" /> : null}
 								{approving ? "Confirming approval…" : "Approve proposal"}
 							</Button>
-						)}
+						</div>
+					)}
+
 					{proposal?.approvedAt && (
-						<p role="status">
-							Approved at {proposal.approvedAt}. Applied activity IDs:{" "}
+						<p role="status" className="text-sm">
+							Approved{" "}
+							<LocalDateTime date={proposal.approvedAt} options={DATE_TIME} />.
+							Applied activity IDs:{" "}
 							{proposal.appliedActivityIds.join(", ") || "None"}.
 						</p>
 					)}
+
+					<section className="flex flex-col gap-2 border-t pt-4">
+						<h3 className="text-muted-foreground text-xs">Details</h3>
+						<DescriptionList size="sm">
+							<DescriptionTerm>Request ID</DescriptionTerm>
+							<DescriptionDetails mono>{request.id}</DescriptionDetails>
+							<DescriptionTerm>Contact ID</DescriptionTerm>
+							<DescriptionDetails mono>{request.contactId}</DescriptionDetails>
+							<DescriptionTerm>Expected contact revision</DescriptionTerm>
+							<DescriptionDetails mono>
+								{request.expectedUpdatedAt}
+							</DescriptionDetails>
+							<DescriptionTerm>Contract</DescriptionTerm>
+							<DescriptionDetails mono>
+								{request.profileId} / {request.profileRevision}
+							</DescriptionDetails>
+							<DescriptionTerm>Requested with</DescriptionTerm>
+							<DescriptionDetails>
+								{request.requestedByKeyId
+									? `API key ${request.requestedByKeyId}`
+									: "Browser session"}
+							</DescriptionDetails>
+							{proposal && (
+								<>
+									<DescriptionTerm>Proposal ID</DescriptionTerm>
+									<DescriptionDetails mono>{proposal.id}</DescriptionDetails>
+									<DescriptionTerm>Produced by</DescriptionTerm>
+									<DescriptionDetails>
+										{proposal.producedBy ?? "Unknown"}
+									</DescriptionDetails>
+									<DescriptionTerm>Filed with</DescriptionTerm>
+									<DescriptionDetails>
+										{proposal.proposedByKeyId
+											? `API key ${proposal.proposedByKeyId}`
+											: "Browser session"}
+									</DescriptionDetails>
+								</>
+							)}
+						</DescriptionList>
+					</section>
 				</div>
 			</CardContent>
 		</Card>

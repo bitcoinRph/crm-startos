@@ -21,8 +21,8 @@ export default function SalesPage() {
 				<PageShellHeading>
 					<PageShellTitle>Sales proposals</PageShellTitle>
 					<PageShellDescription>
-						Review the changes an agent proposes from a customer note, then
-						approve or discard them.
+						An agent reads a customer note and proposes changes. You approve
+						them before the CRM records change.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>

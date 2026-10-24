@@ -104,7 +104,7 @@ export function NewAgentDialog({ children }: { children: React.ReactNode }) {
 		<Dialog onOpenChange={setOpen} open={open}>
 			<DialogTrigger asChild>{children}</DialogTrigger>
 
-			<DialogContent className="sm:max-w-(--container-sheet)">
+			<DialogContent size="wide">
 				<DialogHeader>
 					<DialogTitle>New agent</DialogTitle>
 					<DialogDescription>

@@ -53,7 +53,7 @@ export function CreateChannelDialog({
 		<Dialog onOpenChange={setOpen} open={open}>
 			<DialogTrigger asChild>{children}</DialogTrigger>
 
-			<DialogContent className="sm:max-w-(--container-narrow)">
+			<DialogContent size="narrow">
 				<DialogHeader>
 					<DialogTitle>Create a channel</DialogTitle>
 					<DialogDescription>

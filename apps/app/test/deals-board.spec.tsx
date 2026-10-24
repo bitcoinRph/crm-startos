@@ -8,7 +8,7 @@ import {
 	dealsViewLoader,
 } from "../app/(app)/[slug]/deals/deals-search-params";
 import { DealsTable } from "../app/(app)/[slug]/deals/deals-table";
-import { dropDeal } from "../lib/deal-board";
+import { applyStageMoves, dropDeal } from "../lib/deal-board";
 import { DEAL_BOARD } from "../lib/deal-board-config";
 import { TRPCReactProvider, useTRPC } from "../lib/trpc/client";
 import type { RouterOutputs } from "../lib/trpc/types";
@@ -94,6 +94,24 @@ describe("deals board view", () => {
 		expect(html).not.toContain("Showing the first");
 	});
 
+	it("names each card and column for keyboards and automation", () => {
+		const html = render("?view=board");
+		expect(html).toContain('data-board-item="d1"');
+		expect(html).toContain('data-stage="DEMO_BOOKED"');
+		expect(html).toContain('aria-label="Open Alpha rollout"');
+		expect(html).toContain('aria-label="Deals by stage"');
+		expect(html).toContain('aria-label="View"');
+		expect(html).toContain('data-count="2"');
+	});
+
+	it("shows a drop hint in an empty column", () => {
+		const html = render("?view=board");
+		expect(column(html, "DECISION_MAKER_BOUGHT_IN")).toContain(
+			"Drop a deal here.",
+		);
+		expect(column(html, "DEMO_BOOKED")).not.toContain("Drop a deal here.");
+	});
+
 	it("marks cards draggable", () => {
 		expect(render("?view=board")).toContain('draggable="true"');
 	});
@@ -158,5 +176,20 @@ describe("view search param", () => {
 	it("defaults to table", async () => {
 		expect((await dealsViewLoader("")).view).toBe("table");
 		expect((await dealsViewLoader("?view=nonsense")).view).toBe("table");
+	});
+});
+
+describe("applyStageMoves", () => {
+	it("moves a dropped deal before the server answers", () => {
+		const moved = applyStageMoves(rows, new Map([["d1", "CONTRACT_SENT"]]));
+		expect(moved.find((row) => row.id === "d1")?.stage).toBe("CONTRACT_SENT");
+		expect(moved.find((row) => row.id === "d2")?.stage).toBe(
+			"QUALIFIED_TO_BUY",
+		);
+		expect(rows[0]?.stage).toBe("DEMO_BOOKED");
+	});
+
+	it("returns the rows unchanged when nothing is in flight", () => {
+		expect(applyStageMoves(rows, new Map())).toEqual(rows);
 	});
 });
