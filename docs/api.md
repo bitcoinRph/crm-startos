@@ -257,6 +257,16 @@ from the stored permissions, never from the request.
   procedures decide from the `sales` permissions instead (`sales/sales.auth.ts`):
   a read needs `crm:read` or `sales:read`, a proposal needs
   `sales:proposal:write`, and approval needs a human session, never a key.
+  Rejection (`sales.rejectProposal`) is the same: a human session, a reason,
+  and no CRM record changes.
+- **A decided proposal never changes again.** Database triggers refuse any
+  update to an approved or rejected proposal, and to an `APPROVED` or
+  `REJECTED` request. A proposal holds one decision at most
+  (`salesProposal_single_decision`).
+- **`sales.reviewQueue` is the inbox.** It lists `PROPOSED` requests, which wait
+  for a person, before `PENDING` ones, which wait for an agent, oldest first,
+  with the total counts. It needs `sales:read` or `crm:read`. The MCP tool is
+  `sales_review_queue`. Limits are in `sales/sales-config.ts`.
 - **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
 - **`companies`, `contacts` and `deals` `purge` and `bulkPurge` are denied to every
   key,** legacy keys included. Archive and restore stay open to a write key.

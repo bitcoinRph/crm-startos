@@ -191,6 +191,40 @@ export class DealsService {
 		};
 	}
 
+	async stageValues(input: DealListInput) {
+		const filterableFields = await this.fields.filterableFieldsFor("DEAL");
+		const where = this.buildWhere(input, filterableFields);
+		const openWhere = { ...where, stage: { in: [...OPEN_DEAL_STAGES] } };
+		const base = await this.conversion.reportingCurrency();
+
+		const [counted, pending] = await Promise.all([
+			this.db.deal.groupBy({
+				by: ["stage"],
+				where: { AND: [openWhere, this.conversion.countedWhere(base)] },
+				_sum: { baseAmount: true },
+			}),
+			this.db.deal.groupBy({
+				by: ["stage"],
+				where: { AND: [openWhere, this.conversion.pendingWhere(base)] },
+				_count: { _all: true },
+			}),
+		]);
+
+		return {
+			reportingCurrency: base,
+			stages: OPEN_DEAL_STAGES.map((stage) => ({
+				stage,
+				valueCents:
+					toCents(
+						counted.find((group) => group.stage === stage)?._sum.baseAmount ??
+							null,
+					) ?? 0,
+				unconverted:
+					pending.find((group) => group.stage === stage)?._count._all ?? 0,
+			})),
+		};
+	}
+
 	async byId(id: string) {
 		const deal = await this.db.deal.findUnique({
 			where: { id },

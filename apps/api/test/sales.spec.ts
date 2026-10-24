@@ -147,6 +147,10 @@ function fixture() {
 					approvedById: null,
 					approvedSessionId: null,
 					appliedActivityIds: [],
+					rejectedAt: null,
+					rejectedById: null,
+					rejectedSessionId: null,
+					rejectionReason: null,
 				}),
 			findUnique: async () =>
 				state.proposal ? { ...state.proposal, request: state.request } : null,

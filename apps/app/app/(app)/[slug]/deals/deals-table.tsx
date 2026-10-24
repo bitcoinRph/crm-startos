@@ -286,7 +286,11 @@ export function DealsTable() {
 			}
 			body={
 				board ? (
-					<DealsBoard rows={rows} total={deals.data?.total ?? 0} />
+					<DealsBoard
+						rows={rows}
+						total={deals.data?.total ?? 0}
+						input={dealsBoardInput(input)}
+					/>
 				) : undefined
 			}
 			columns={columns}

@@ -14,8 +14,8 @@ one is a separate PR. Written in ASD-STE100 per `AGENTS.md`.
 | Creator follow-ups | `follow_ups` | `activities.followUps` | `GET /activities/follow-ups` |
 | Read a record | `get_contact`, `get_company`, `get_deal`, `timeline`, `my_tasks`, `dashboard_summary`, `whoami`, `list_*` | same | same |
 | Change a record | `create_*`, `update_*`, `set_deal_stage`, `attach_contact_to_deal`, `log_activity`, `complete_task`, `enrich_*` | same | same |
-| Sales proposals | `sales_create_request`, `sales_get_request`, `sales_pending_requests`, `sales_store_proposal`, `sales_fail_request` | `sales.*` | `/sales/*` |
-| Approve a proposal | none | `sales.approveProposal` (session only) | `POST /sales/proposals/approve` (session only) |
+| Sales proposals | `sales_create_request`, `sales_get_request`, `sales_pending_requests`, `sales_review_queue`, `sales_store_proposal`, `sales_fail_request` | `sales.*` | `/sales/*` |
+| Approve or reject a proposal | none | `sales.approveProposal`, `sales.rejectProposal` (session only) | `POST /sales/proposals/approve`, `POST /sales/proposals/reject` (session only) |
 | Manage keys, SSO, tracking, purges, bulk | none | session only | session only |
 
 ### Decision: MCP is the agent surface

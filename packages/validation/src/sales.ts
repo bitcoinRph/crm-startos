@@ -107,6 +107,12 @@ export const salesApproveInput = z.strictObject({
 	proposalId: z.uuid(),
 	idempotencyKey: z.uuid(),
 });
+export const SALES_REJECTION_REASON_MAX = 500;
+export const salesRejectInput = z.strictObject({
+	proposalId: z.uuid(),
+	idempotencyKey: z.uuid(),
+	reason: z.string().trim().min(1).max(SALES_REJECTION_REASON_MAX),
+});
 export type SalesRequestInput = z.infer<typeof salesRequestInput>;
 export type SalesOperation = z.infer<typeof salesOperation>;
 export function validateSalesOperations(

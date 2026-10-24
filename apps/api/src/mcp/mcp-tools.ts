@@ -23,6 +23,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
 			"Read pending sales extraction requests. Requires explicit CRM read or sales read permission.",
 	},
 	{
+		name: "sales_review_queue",
+		procedure: "sales.reviewQueue",
+		description:
+			"List sales requests that wait on someone: PROPOSED ones wait for a human to approve or reject them in the CRM, PENDING ones wait for an agent to file a proposal. PROPOSED come first, oldest first. Returns rows and the total counts. Changes nothing. Requires explicit CRM read or sales read permission.",
+	},
+	{
 		name: "sales_store_proposal",
 		procedure: "sales.storeProposal",
 		description:

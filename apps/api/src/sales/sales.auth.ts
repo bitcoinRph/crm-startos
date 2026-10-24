@@ -8,6 +8,7 @@ import { SALES_SCOPES, type SalesActor } from "./sales.service";
 export const SALES_MCP_SCOPES = new Map<string, readonly string[]>([
 	["sales.getRequest", [SALES_SCOPES.read]],
 	["sales.pendingRequests", [SALES_SCOPES.read]],
+	["sales.reviewQueue", [SALES_SCOPES.read]],
 	["sales.createRequest", [SALES_SCOPES.write, SALES_SCOPES.read]],
 	["sales.storeProposal", [SALES_SCOPES.write, SALES_SCOPES.read]],
 	["sales.failRequest", [SALES_SCOPES.write, SALES_SCOPES.read]],

@@ -2,6 +2,7 @@
 
 import { Board, BoardCard, BoardColumn } from "@crm/ui/components/board";
 import { formatMoney } from "@crm/ui/lib/format";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch";
@@ -10,19 +11,38 @@ import { DealStageMenu, useStageMutation } from "@/components/crm/stage-change";
 import { applyStageMoves, dropDeal, groupDealsByStage } from "@/lib/deal-board";
 import { DEAL_BOARD } from "@/lib/deal-board-config";
 import { dealStageLabel, OPEN_STAGES } from "@/lib/deal-stage";
-import type { RouterOutputs } from "@/lib/trpc/types";
+import { useTRPC } from "@/lib/trpc/client";
+import type { RouterInputs, RouterOutputs } from "@/lib/trpc/types";
 
 type DealRow = RouterOutputs["deals"]["list"]["rows"][number];
 
 type DealStage = DealRow["stage"];
 
+type StageValues = RouterOutputs["deals"]["stageValues"];
+
+function stageSummary(values: StageValues | undefined, stage: DealStage) {
+	const entry = values?.stages.find((item) => item.stage === stage);
+	if (!values || !entry) return null;
+	const value = formatMoney(entry.valueCents, values.reportingCurrency);
+	return entry.unconverted > 0
+		? `${value} · ${entry.unconverted} not counted`
+		: value;
+}
+
 export function DealsBoard({
 	rows,
 	total,
+	input,
 }: {
 	rows: DealRow[];
 	total: number;
+	input: RouterInputs["deals"]["stageValues"];
 }) {
+	const trpc = useTRPC();
+	const stageValues = useQuery({
+		...trpc.deals.stageValues.queryOptions(input),
+		placeholderData: (previous) => previous,
+	});
 	const openRecord = useOpenRecord();
 	const prefetchRecord = usePrefetchRecord();
 	const setStage = useStageMutation();
@@ -65,6 +85,7 @@ export function DealsBoard({
 							count={deals.length}
 							dragType={DEAL_BOARD.dragType}
 							empty="Drop a deal here."
+							summary={stageSummary(stageValues.data, stage)}
 							onDropItem={(dealId) =>
 								dropDeal({
 									dealId,

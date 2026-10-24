@@ -23,14 +23,14 @@ import { conversationListInput, conversationListOutput, builderListOutput, build
 import { csvExportInput, csvExportOutput, csvImportInput, csvImportOutput } from "../csv/csv.contracts";
 import { currencySettingsOutput, setReportingCurrencyInput, setManualRateInput, removeManualRateInput } from "../currency/currency.contracts";
 import { dashboardSummaryInput, dashboardSummaryOutput } from "../dashboard/dashboard.contracts";
-import { dealListInput, dealListOutput, dealIdInput, dealDetailOutput, dealCreateInput, dealCreateOutput, dealUpdateArgs, dealMutateOutput, setStageInput, dealSetStageOutput, dealContactsInput, dealContactOptionsOutput, dealAttachContactInput, dealContactLinkOutput, dealDetachContactInput, dealContactRoleInput, dealContactRoleOutput, dealBulkOwnerInput, dealBulkResultOutput, dealBulkStageInput, dealBulkInput } from "../deals/deals.contracts";
+import { dealListInput, dealListOutput, dealStageValuesOutput, dealIdInput, dealDetailOutput, dealCreateInput, dealCreateOutput, dealUpdateArgs, dealMutateOutput, setStageInput, dealSetStageOutput, dealContactsInput, dealContactOptionsOutput, dealAttachContactInput, dealContactLinkOutput, dealDetachContactInput, dealContactRoleInput, dealContactRoleOutput, dealBulkOwnerInput, dealBulkResultOutput, dealBulkStageInput, dealBulkInput } from "../deals/deals.contracts";
 import { enrichmentQueueInput } from "@crm/validation/enrichment-queue";
 import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput, fieldEntityInput, fieldFiltersOutput, fieldIdInput, fieldCoverageOutput, fieldCreateInput, fieldUpdateArgs, fieldReorderInput, fieldReorderOutput, fieldDeleteOutput, fieldBackfillOutput } from "../fields/fields.contracts";
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
 import { intakeSubmitInput, intakeSubmitOutput } from "../intake/intake.contracts";
-import { salesRequestInput, salesRequestIdInput, salesSubmitInput, salesApproveInput } from "@crm/validation/sales";
-import { salesRequestOutput, salesPendingInput, salesPendingOutput, salesProposalOutput } from "../sales/sales.contracts";
+import { salesRequestInput, salesRequestIdInput, salesSubmitInput, salesApproveInput, salesRejectInput } from "@crm/validation/sales";
+import { salesRequestOutput, salesPendingInput, salesPendingOutput, salesReviewQueueInput, salesReviewQueueOutput, salesProposalOutput } from "../sales/sales.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
 import { resolveCustomerInput, resolveCustomerOutput } from "../search/search.contracts";
 import { agentModelOutput, modelCatalogOutput, setAgentModelInput, researchKeyOutput, setResearchKeyInput, archiveRetentionOutput, setArchiveRetentionDaysInput } from "../settings/settings.contracts";
@@ -417,6 +417,10 @@ const appRouter = t.router({
       .input(dealListInput)
       .output(dealListOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    stageValues: publicProcedure
+      .input(dealListInput)
+      .output(dealStageValuesOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     byId: publicProcedure
       .input(dealIdInput)
       .output(dealDetailOutput)
@@ -652,12 +656,20 @@ const appRouter = t.router({
       .input(salesPendingInput)
       .output(salesPendingOutput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    reviewQueue: publicProcedure
+      .input(salesReviewQueueInput)
+      .output(salesReviewQueueOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     storeProposal: publicProcedure
       .input(salesSubmitInput)
       .output(salesProposalOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
     approveProposal: publicProcedure
       .input(salesApproveInput)
+      .output(salesProposalOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    rejectProposal: publicProcedure
+      .input(salesRejectInput)
       .output(salesProposalOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
