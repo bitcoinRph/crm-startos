@@ -248,7 +248,7 @@ from the stored permissions, never from the request.
 
 | Profile | Permissions | What it can do |
 | --- | --- | --- |
-| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can |
+| `crm_integration` | `crm:read`, `crm:write` | Every query and mutation the user can, except purge |
 | `agent_propose` | `crm:read`, `sales:read`, `sales:proposal:write` | Read, and file proposals for a human to approve |
 | `agent_read` | `crm:read` | Queries only |
 
@@ -257,6 +257,8 @@ from the stored permissions, never from the request.
   a read needs `crm:read` or `sales:read`, a proposal needs
   `sales:proposal:write`, and approval needs a human session, never a key.
 - **`apiKeys.*` is denied to every key.** Only a browser session manages keys.
+- **`companies`, `contacts` and `deals` `purge` and `bulkPurge` are denied to every
+  key,** legacy keys included. Archive and restore stay open to a write key.
 - **A legacy key has null permissions.** It keeps non-sales CRM access. Every `sales.*` call requires explicit permissions.
   The existing table label says *Legacy: full access*. The owner rotates the key; discovery does not grant permissions.
 - **The profile name says what the key can do, not which agent holds it.** The
@@ -349,6 +351,11 @@ row is still there, just filtered out of every list.
 - **A rep can `purge` straight from the Archived view — retention is a ceiling, not a
   wait.** `bulkPurge`/the per-record "Delete forever" action call it directly, no
   different from the cron.
+- **Only a workspace owner or admin can `purge` or `bulkPurge`, and no API key can.**
+  The routers ask `AgentAccessService.assertCanPurge` (`canPurgeRecords`, `@crm/auth`)
+  and answer a member with `FORBIDDEN`; `authorizeApiKeyProcedure` denies the six
+  purge procedures to every key, so an agent archives and a human purges.
+  `purgeExpired` calls the service directly and is not affected.
 
 **Pruning**: `ArchiveRetentionController` (`internal/archive/prune`, `CRON_SECRET`-gated,
 `apps/api/vercel.json`) reads `AppSetting.archiveRetentionDays`

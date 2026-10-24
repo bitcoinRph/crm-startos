@@ -1,4 +1,5 @@
 import {
+	canPurgeRecords,
 	isWorkspaceAdmin,
 	toWorkspaceRole,
 	WORKSPACE_ID,
@@ -26,6 +27,16 @@ export class AgentAccessService {
 		}
 
 		return role;
+	}
+
+	async assertCanPurge(userId: string): Promise<void> {
+		const role = await this.assertMember(userId);
+
+		if (!canPurgeRecords(role)) {
+			throw new ForbiddenException(
+				"Only an owner or an admin can permanently delete records. Archive the record instead.",
+			);
+		}
 	}
 
 	async assertCanManageInTransaction(

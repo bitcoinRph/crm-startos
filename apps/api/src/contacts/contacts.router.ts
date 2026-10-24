@@ -8,6 +8,7 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { AgentAccessService } from "../agent/agent-access.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
@@ -35,6 +36,7 @@ import { ContactsService } from "./contacts.service";
 export class ContactsRouter {
 	constructor(
 		@Inject(ContactsService) private readonly contacts: ContactsService,
+		@Inject(AgentAccessService) private readonly access: AgentAccessService,
 	) {}
 
 	@Query({
@@ -96,7 +98,8 @@ export class ContactsRouter {
 		output: contactNameOutput,
 		meta: restMeta("DELETE", "/contacts/{id}", ["Contacts"]),
 	})
-	async purge(@Input("id") id: string) {
+	async purge(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.contacts.purge(id);
 	}
 
@@ -161,7 +164,8 @@ export class ContactsRouter {
 		output: bulkResultOutput,
 		meta: restMeta("POST", "/contacts/bulk-purge", ["Contacts"]),
 	})
-	async bulkPurge(@Input("ids") ids: string[]) {
+	async bulkPurge(@Ctx() ctx: AuthedTrpcContext, @Input("ids") ids: string[]) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.contacts.bulkPurge(ids);
 	}
 
