@@ -37,7 +37,7 @@ const closeReasonParams = {
 	[SEARCH_PARAM.dialog.closeStage]: parseAsString,
 };
 
-function useStageMutation(onDone?: () => void) {
+export function useStageMutation(onDone?: () => void) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 
