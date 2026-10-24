@@ -462,13 +462,16 @@ import, mail sync, the agent and raw SQL included.
 - **The actor is a connection setting, not an argument.** `runAsChangeActor`
   (`@crm/db/change-actor`) holds the actor in `AsyncLocalStorage`. The pool in
   `packages/db/src/client.ts` sets `crm.actor` with `set_config(..., true)` inside
-  the write's own transaction: an autocommit write runs as `BEGIN`, the setting,
-  the write, `COMMIT`, and a transaction sets it before each write statement. The
-  setting never outlives the transaction, so a pooled connection carries no stale
-  actor and a transaction-mode pooler keeps both on one backend. `AuthMiddleware` runs every tRPC,
-  MCP and REST call as `USER` or `API_KEY`; `apps/agent/agent/agent.ts` makes the
-  agent's default `AGENT`; anything else is `SYSTEM`. `runAsChangeActor` awaits
-  inside the context, because a Prisma promise runs only when it is awaited.
+  the write's own transaction: an autocommit write runs as one `BEGIN` plus the
+  settings, the write and `COMMIT`; a transaction sets them once, before its first
+  write statement, so `SET TRANSACTION` still comes first and a read-only
+  transaction pays nothing. The setting never outlives the transaction, so a pooled
+  connection carries no stale actor and a transaction-mode pooler keeps both on one
+  backend. `AuthMiddleware` runs every tRPC, MCP and REST call as `USER` or
+  `API_KEY`; `apps/agent/agent/agent.ts` makes the agent's default `AGENT`; anything
+  else is `SYSTEM`. `runAsChangeActor` awaits inside the context, because a Prisma
+  promise runs only when it is awaited. Measured on a local Postgres, an
+  autocommit update costs about 0.3 ms more than on a plain pool.
 - **Only real changes are rows.** An update stores the changed columns only, minus
   the bookkeeping columns the trigger is created with (`updatedAt`,
   `lastActivityAt`, enrichment status, the deal's `stageChangedAt` and exchange-rate
@@ -476,17 +479,24 @@ import, mail sync, the agent and raw SQL included.
   delete is an update of that field's value, with `fieldId` set.
 - **A purge forgets the record.** Deleting a company, contact or deal deletes its
   ledger rows in the same statement. A field-value delete cascaded from a purged
-  record or a deleted field definition writes none.
-  The archive prune deletes rows older than `archiveRetentionDays`.
+  record or a deleted field definition writes none. The archive prune deletes rows
+  older than `archiveRetentionDays`, and a person can forget one change
+  (`recordChanges.forget`, every key denied), which deletes that row.
 - **`recordChanges.list` reads it** (`crm:read`; MCP tool `record_history`): by
-  record (`entity` + `recordId`) or by key (`apiKeyId`), newest first.
+  record (`entity` + `recordId`) or by key (`apiKeyId`), newest first. A key gets
+  the rows without `before` and `after` (`valuesHidden`), because those can hold
+  values a person removed on purpose; a browser session sees them.
 - **`recordChanges.revert` is for a person only.** Every key is denied
-  (`HUMAN_ONLY_PROCEDURE`). It refuses with `CONFLICT` when a changed column has
-  moved since, and it undoes through the services (`update`, `archive`/`restore`,
-  `setStage`), so normalisation, exchange rates and events run as for any edit. It
-  refuses with `CONFLICT` when the company or owner it would point back to is gone.
-  The undo is itself a ledger row. Custom-field values and creates cannot be undone here;
-  `revertible` in the list says which rows can.
+  (`HUMAN_ONLY_PROCEDURE`). It undoes through the services (`update` with the
+  record's fields or one custom field, `archive`/`restore`, `setStage` with the
+  original `closedAt`), so normalisation, exchange rates and events run as for any
+  edit. Undoing a create archives the record; purge stays a separate, human step.
+- **An undo cannot overwrite a newer edit.** It runs inside
+  `runWithChangeExpectation`, which the pool sends as `crm.expect`: the change's
+  `after` values. The trigger refuses, in the same statement and under the row
+  lock, any write that changes an expected column whose current value is not the
+  expected one, and the service answers `CONFLICT`. It also refuses when the
+  company or owner it would point back to is gone. The undo is itself a ledger row.
 
 ## Money
 

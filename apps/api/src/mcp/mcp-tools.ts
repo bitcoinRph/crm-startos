@@ -181,7 +181,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "record_history",
 		procedure: "recordChanges.list",
 		description:
-			"List recorded changes to companies, contacts and deals, newest first. Filter by entity and recordId for one record, or by apiKeyId for one key's writes. Each change has the changed fields before and after, who made it (USER, API_KEY, AGENT or SYSTEM) and whether a person can undo it in the CRM. Changes nothing.",
+			"List recorded changes to companies, contacts and deals, newest first. Filter by entity and recordId for one record, or by apiKeyId for one key's writes. Each change names who made it (USER, API_KEY, AGENT or SYSTEM), when, and whether a person can undo it in the CRM. An API key gets the changed fields without their values (valuesHidden is true); a person sees the values in the CRM. Changes nothing.",
 	},
 	{
 		name: "my_tasks",

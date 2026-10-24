@@ -34,6 +34,8 @@ CREATE INDEX "recordChange_createdAt_idx" ON "recordChange"("createdAt");
 CREATE OR REPLACE FUNCTION crm_record_change() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   actor text := nullif(current_setting('crm.actor', true), '');
+  expected jsonb := nullif(current_setting('crm.expect', true), '')::jsonb;
+  conflicted text;
   actor_kind "ChangeActorKind" := 'SYSTEM';
   actor_id text;
   actor_user_id text;
@@ -77,6 +79,20 @@ BEGIN
     ELSE
       old_row := to_jsonb(OLD) - TG_ARGV;
       new_row := to_jsonb(NEW) - TG_ARGV;
+    END IF;
+  END IF;
+
+  IF change_operation = 'UPDATE'
+     AND expected IS NOT NULL
+     AND expected->>'entity' = record_entity::text
+     AND expected->>'recordId' = record_id
+     AND (expected->>'fieldId') IS NOT DISTINCT FROM field_id THEN
+    SELECT string_agg(k, ', ') INTO conflicted
+      FROM jsonb_object_keys(expected->'values') AS k
+     WHERE coalesce(new_row->k, 'null'::jsonb) IS DISTINCT FROM coalesce(old_row->k, 'null'::jsonb)
+       AND coalesce(old_row->k, 'null'::jsonb) IS DISTINCT FROM coalesce(expected->'values'->k, 'null'::jsonb);
+    IF conflicted IS NOT NULL THEN
+      RAISE EXCEPTION 'crm_change_conflict: %', conflicted;
     END IF;
   END IF;
 

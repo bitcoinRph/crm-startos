@@ -8,10 +8,13 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { keyFromHeaders } from "../trpc/api-key-access";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
 import {
+	recordChangeForgetInput,
+	recordChangeForgetOutput,
 	recordChangeRevertInput,
 	recordChangeRevertOutput,
 	recordChangesListInput,
@@ -32,8 +35,14 @@ export class RecordChangesRouter {
 		output: recordChangesListOutput,
 		meta: restMeta("GET", "/record-changes", ["Record changes"]),
 	})
-	async list(@Input() input: z.infer<typeof recordChangesListInput>) {
-		return this.changes.list(input);
+	async list(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof recordChangesListInput>,
+	) {
+		return this.changes.list(
+			input,
+			keyFromHeaders(ctx.req?.headers ?? {}) === null,
+		);
 	}
 
 	@Mutation({
@@ -46,5 +55,14 @@ export class RecordChangesRouter {
 		@Input() input: z.infer<typeof recordChangeRevertInput>,
 	) {
 		return this.changes.revert(input.id, ctx.user.id);
+	}
+
+	@Mutation({
+		input: recordChangeForgetInput,
+		output: recordChangeForgetOutput,
+		meta: restMeta("POST", "/record-changes/forget", ["Record changes"]),
+	})
+	async forget(@Input() input: z.infer<typeof recordChangeForgetInput>) {
+		return this.changes.forget(input.id);
 	}
 }

@@ -34,6 +34,7 @@ export const recordChangeOutput = z.object({
 	operation: z.enum(["CREATE", "UPDATE"]),
 	before: changeValues.nullable(),
 	after: changeValues.nullable(),
+	valuesHidden: z.boolean(),
 	actorKind: z.enum(["USER", "API_KEY", "AGENT", "SYSTEM"]),
 	actorId: z.string().nullable(),
 	actorUserId: z.string().nullable(),
@@ -45,6 +46,9 @@ export type RecordChangeOutput = z.infer<typeof recordChangeOutput>;
 export const recordChangesListOutput = z.array(recordChangeOutput);
 
 export const recordChangeRevertInput = z.strictObject({ id: z.uuid() });
+export const recordChangeForgetInput = z.strictObject({ id: z.uuid() });
+export const recordChangeForgetOutput = z.object({ id: z.string() });
+
 export const recordChangeRevertOutput = z.object({
 	entity: recordEntity,
 	recordId: z.string(),

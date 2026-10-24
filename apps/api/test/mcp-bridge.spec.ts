@@ -13,7 +13,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { setImmediate } from "node:timers/promises";
 import { API_KEY_RATE_LIMIT, auth } from "@crm/auth";
 import { db } from "@crm/db";
-import { runAsChangeActor } from "@crm/db/change-actor";
+import {
+	runAsChangeActor,
+	runWithChangeExpectation,
+} from "@crm/db/change-actor";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -2211,15 +2214,29 @@ const historyRow = z.object({
 	actorId: z.string().nullable(),
 	actorUserId: z.string().nullable(),
 	revertible: z.boolean(),
+	valuesHidden: z.boolean(),
 });
 const history = z.array(historyRow);
 
+async function historyAsPerson(entity: string, recordId: string) {
+	const url = new URL("/rest/record-changes", endpoint);
+	url.searchParams.set("entity", entity);
+	url.searchParams.set("recordId", recordId);
+	const response = await fetch(url, { headers: { cookie } });
+	expect(response.status).toBe(200);
+	return history.parse(await response.json());
+}
+
 function contactHistory() {
-	return read(
-		"record_history",
-		{ entity: "CONTACT", recordId: contactId },
-		history,
-	);
+	return historyAsPerson("CONTACT", contactId);
+}
+
+function forgetAsPerson(id: string) {
+	return fetch(new URL("/rest/record-changes/forget", endpoint), {
+		method: "POST",
+		headers: { "content-type": "application/json", cookie },
+		body: JSON.stringify({ id }),
+	});
 }
 
 function revertAsPerson(id: string) {
@@ -2346,7 +2363,7 @@ describe("record change ledger", () => {
 		expect(system).toMatchObject({ actorKind: "SYSTEM", actorId: null });
 	});
 
-	it("labels custom field changes, keeps them out of undo, and forgets a purged record", async () => {
+	it("labels and undoes custom field changes, guards them against newer edits, and forgets a purged record", async () => {
 		const field = await db.fieldDefinition.create({
 			data: {
 				entity: "CONTACT",
@@ -2357,18 +2374,41 @@ describe("record change ledger", () => {
 			},
 		});
 		try {
-			await db.fieldValue.create({
-				data: { fieldId: field.id, contactId, text: "Gold" },
+			const key = await createKey("crm_integration");
+			const writer = await connect({ "x-api-key": key.key });
+			const silver = await call(writer, {
+				name: "update_contact",
+				arguments: {
+					id: contactId,
+					data: { fields: { [field.key]: "Silver" } },
+				},
 			});
-			const [change] = await contactHistory();
-			expect(change).toMatchObject({
+			expect(silver.isError).not.toBe(true);
+			const gold = await call(writer, {
+				name: "update_contact",
+				arguments: { id: contactId, data: { fields: { [field.key]: "Gold" } } },
+			});
+			expect(gold.isError).not.toBe(true);
+			const [toGold, toSilver] = await contactHistory();
+			expect(toGold).toMatchObject({
 				fieldId: field.id,
 				fieldLabel: "Tier",
+				before: { text: "Silver" },
 				after: { text: "Gold" },
-				revertible: false,
+				actorKind: "API_KEY",
+				revertible: true,
 			});
-			const response = await revertAsPerson(z.string().parse(change?.id));
-			expect(response.status).toBe(400);
+
+			expect(
+				(await revertAsPerson(z.string().parse(toSilver?.id))).status,
+			).toBe(409);
+			expect((await revertAsPerson(z.string().parse(toGold?.id))).status).toBe(
+				200,
+			);
+			const value = await db.fieldValue.findFirstOrThrow({
+				where: { fieldId: field.id, contactId },
+			});
+			expect(value.text).toBe("Silver");
 
 			await db.contact.delete({ where: { id: contactId } });
 			expect(
@@ -2379,11 +2419,139 @@ describe("record change ledger", () => {
 		}
 	});
 
+	it("undoes a creation by archiving the record", async () => {
+		const key = await createKey("crm_integration");
+		const writer = await connect({ "x-api-key": key.key });
+		const created = await call(writer, {
+			name: "create_contact",
+			arguments: {
+				firstName: `${prefix} created`,
+				email: `created@${prefix}.test`,
+			},
+		});
+		expect(created.isError).not.toBe(true);
+		const contact = await db.contact.findFirstOrThrow({
+			where: { email: `created@${prefix}.test` },
+		});
+		try {
+			const [creation] = await historyAsPerson("CONTACT", contact.id);
+			expect(creation).toMatchObject({
+				actorKind: "API_KEY",
+				revertible: true,
+			});
+			expect(
+				(await revertAsPerson(z.string().parse(creation?.id))).status,
+			).toBe(200);
+			const archived = await db.contact.findUniqueOrThrow({
+				where: { id: contact.id },
+			});
+			expect(archived.archivedAt).not.toBeNull();
+			expect(
+				(await revertAsPerson(z.string().parse(creation?.id))).status,
+			).toBe(409);
+		} finally {
+			await db.contact.delete({ where: { id: contact.id } });
+		}
+	});
+
+	it("keeps the original close date when a reopened deal is undone", async () => {
+		await db.deal.update({
+			where: { id: dealId },
+			data: {
+				stage: "CLOSED_WON",
+				closedAt: new Date("2026-01-15T12:00:00.000Z"),
+			},
+		});
+		const key = await createKey("crm_integration");
+		const writer = await connect({ "x-api-key": key.key });
+		const reopened = await call(writer, {
+			name: "set_deal_stage",
+			arguments: { id: dealId, stage: "QUALIFIED_TO_BUY" },
+		});
+		expect(reopened.isError).not.toBe(true);
+		const [reopen] = await historyAsPerson("DEAL", dealId);
+		expect((await revertAsPerson(z.string().parse(reopen?.id))).status).toBe(
+			200,
+		);
+		const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+		expect(deal.stage).toBe("CLOSED_WON");
+		expect(deal.closedAt?.toISOString()).toBe("2026-01-15T12:00:00.000Z");
+	});
+
+	it("shows values to a person, hides them from keys, and lets only a person forget a change", async () => {
+		await runAsChangeActor({ kind: "AGENT" }, () =>
+			db.contact.update({
+				where: { id: contactId },
+				data: { phone: "+1 555 0199" },
+			}),
+		);
+		const [personView] = await contactHistory();
+		expect(personView).toMatchObject({
+			after: { phone: "+1 555 0199" },
+			valuesHidden: false,
+		});
+		const [keyView] = await read(
+			"record_history",
+			{ entity: "CONTACT", recordId: contactId },
+			history,
+		);
+		expect(keyView).toMatchObject({
+			id: personView?.id,
+			before: null,
+			after: null,
+			valuesHidden: true,
+		});
+
+		const key = await createKey("crm_integration");
+		const byKey = await fetch(
+			new URL("/rest/record-changes/forget", endpoint),
+			{
+				method: "POST",
+				headers: { "content-type": "application/json", "x-api-key": key.key },
+				body: JSON.stringify({ id: personView?.id }),
+			},
+		);
+		expect(byKey.status).toBe(403);
+		expect(
+			(await forgetAsPerson(z.string().parse(personView?.id))).status,
+		).toBe(200);
+		expect(
+			await db.recordChange.findUnique({
+				where: { id: z.string().parse(personView?.id) },
+			}),
+		).toBeNull();
+	});
+
+	it("refuses a write that would overwrite a newer value under an expectation", async () => {
+		await db.contact.update({
+			where: { id: contactId },
+			data: { title: "Current" },
+		});
+		await expect(
+			runWithChangeExpectation(
+				{
+					entity: "CONTACT",
+					recordId: contactId,
+					fieldId: null,
+					values: { title: "Stale" },
+				},
+				() =>
+					db.contact.update({
+						where: { id: contactId },
+						data: { title: "Overwrite" },
+					}),
+			),
+		).rejects.toThrow("crm_change_conflict: title");
+		const contact = await db.contact.findUniqueOrThrow({
+			where: { id: contactId },
+		});
+		expect(contact.title).toBe("Current");
+	});
+
 	it("undoes a deal amount and a stage through the deal service", async () => {
 		const key = await createKey("crm_integration");
 		const writer = await connect({ "x-api-key": key.key });
-		const dealHistory = () =>
-			read("record_history", { entity: "DEAL", recordId: dealId }, history);
+		const dealHistory = () => historyAsPerson("DEAL", dealId);
 		const before = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
 
 		const priced = await call(writer, {
