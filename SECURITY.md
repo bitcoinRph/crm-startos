@@ -18,8 +18,9 @@ public or multi-tenant service boundary, and the design says so out loud in a fe
 limits below are real and worth reading before you put customer data in it.
 
 **Sign-in is the entire authorisation model.** `ALLOWED_SIGN_IN` decides who gets in; after that,
-every signed-in person can read and write every record. There are no roles, no per-record
-permissions and no organizations — deliberately, because a permissions check that always returns
+every signed-in person can read and write every record, and only a workspace owner or admin can
+permanently delete one (API keys can never purge). There are no per-record permissions and no
+organizations — deliberately, because a permissions check that always returns
 `true` reads like a real one at review time. If you need someone to see only part of the pipeline,
 this is the wrong tool today.
 

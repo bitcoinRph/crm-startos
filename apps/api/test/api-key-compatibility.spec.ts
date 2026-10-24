@@ -148,4 +148,30 @@ describe("API key access policy", () => {
 			}
 		}
 	});
+
+	it("denies every key every purge procedure and still allows archive", () => {
+		const keys = [
+			legacy,
+			...Object.values(KEY_PERMISSIONS).map((permissions) =>
+				scoped(permissions),
+			),
+		];
+		for (const key of keys) {
+			for (const resource of ["companies", "contacts", "deals"]) {
+				for (const name of ["purge", "bulkPurge"]) {
+					expect(
+						authorizeApiKeyProcedure(key, `${resource}.${name}`, "mutation"),
+					).toBe("deny");
+				}
+			}
+		}
+		const writer = scoped(KEY_PERMISSIONS.crm_integration);
+		for (const resource of ["companies", "contacts", "deals"]) {
+			for (const name of ["archive", "bulkArchive", "restore"]) {
+				expect(
+					authorizeApiKeyProcedure(writer, `${resource}.${name}`, "mutation"),
+				).toBe("allow");
+			}
+		}
+	});
 });

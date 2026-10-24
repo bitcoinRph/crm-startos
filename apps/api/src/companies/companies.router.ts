@@ -8,6 +8,7 @@ import {
 	UseMiddlewares,
 } from "nestjs-trpc";
 import type { z } from "zod";
+import { AgentAccessService } from "../agent/agent-access.service";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import { restMeta } from "../trpc/openapi";
@@ -37,6 +38,7 @@ import { CompaniesService } from "./companies.service";
 export class CompaniesRouter {
 	constructor(
 		@Inject(CompaniesService) private readonly companies: CompaniesService,
+		@Inject(AgentAccessService) private readonly access: AgentAccessService,
 	) {}
 
 	@Query({
@@ -107,7 +109,8 @@ export class CompaniesRouter {
 		output: companyArchiveResultOutput,
 		meta: restMeta("DELETE", "/companies/{id}", ["Companies"]),
 	})
-	async purge(@Input("id") id: string) {
+	async purge(@Ctx() ctx: AuthedTrpcContext, @Input("id") id: string) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.companies.purge(id);
 	}
 
@@ -152,7 +155,8 @@ export class CompaniesRouter {
 		output: companyBulkResultOutput,
 		meta: restMeta("POST", "/companies/bulk-purge", ["Companies"]),
 	})
-	async bulkPurge(@Input("ids") ids: string[]) {
+	async bulkPurge(@Ctx() ctx: AuthedTrpcContext, @Input("ids") ids: string[]) {
+		await this.access.assertCanPurge(ctx.user.id);
 		return this.companies.bulkPurge(ids);
 	}
 
