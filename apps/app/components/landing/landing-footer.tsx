@@ -1,3 +1,4 @@
+import { BRAND } from "@crm/env/brand";
 import { Link } from "@crm/ui/components/link";
 import Logo from "@crm/ui/components/logo";
 import { REPO_LINKS } from "./links";
@@ -38,13 +39,7 @@ export function LandingFooter() {
 					<p className="flex flex-1 items-center gap-[5px] pt-[2px] text-[13px]/[21px] text-muted-foreground">
 						Built with love by
 						<Logo className="size-[13px] shrink-0 text-foreground" />
-						<Link
-							href="https://trycomp.ai?utm_source=crm_landing_footer&utm_medium=referral"
-							target="_blank"
-							className="font-medium text-foreground"
-						>
-							Comp AI
-						</Link>
+						<span className="font-medium text-foreground">{BRAND.company}</span>
 					</p>
 
 					<p className="flex items-center gap-2 text-[13px]/5 text-muted-foreground">

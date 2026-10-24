@@ -11,6 +11,7 @@ import {
 import { Injectable } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
 import { InjectDatabase } from "../database/database.constants";
+import { readSnapshot } from "../database/read-snapshot";
 import { SALES } from "./sales-config";
 
 export type SalesActor =
@@ -116,17 +117,21 @@ export class SalesService {
 
 	async reviewQueue(actor: SalesActor, limit: number) {
 		requireSalesScope(actor, SALES_SCOPES.read);
-		const [rows, pending, proposed] = await this.db.$transaction([
-			this.db.salesRequest.findMany({
+		return readSnapshot(this.db, async (tx) => {
+			const rows = await tx.salesRequest.findMany({
 				where: { status: { in: ["PROPOSED", "PENDING"] } },
 				orderBy: [{ status: "desc" }, { createdAt: "asc" }],
 				take: limit,
 				include: { proposal: true },
-			}),
-			this.db.salesRequest.count({ where: { status: "PENDING" } }),
-			this.db.salesRequest.count({ where: { status: "PROPOSED" } }),
-		]);
-		return { rows, counts: { pending, proposed } };
+			});
+			const pending = await tx.salesRequest.count({
+				where: { status: "PENDING" },
+			});
+			const proposed = await tx.salesRequest.count({
+				where: { status: "PROPOSED" },
+			});
+			return { rows, counts: { pending, proposed } };
+		});
 	}
 
 	async storeProposal<T>(actor: SalesActor, raw: T) {
@@ -299,7 +304,13 @@ export class SalesService {
 					code: "CONFLICT",
 					message: "Approval key mismatch.",
 				});
-			if (proposal.rejectedAt) return proposal;
+			if (proposal.rejectedAt) {
+				if (proposal.rejectionReason === input.reason) return proposal;
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "This proposal was already rejected with another reason.",
+				});
+			}
 			if (proposal.approvedAt)
 				throw new TRPCError({
 					code: "CONFLICT",

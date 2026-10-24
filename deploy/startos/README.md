@@ -103,7 +103,7 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | MCP | 3000 | HTTP behind the StartOS proxy | `/api/mcp` | Streamable HTTP MCP endpoint, authenticated with a CRM API key |
 | REST API | 3000 | HTTP behind the StartOS proxy | `/openapi.json` | OpenAPI document of the API. Tools call `/rest/*` on the same address with a CRM API key (`x-api-key` or `Authorization: Bearer`) |
 
-All three interfaces share one binding. The app proxies `/api/*`, `/rest/*` and `/openapi.json` to the API, so the MCP endpoint, the tRPC surface, the REST bridge and the OpenAPI document are on the web app's origin. The OpenAPI document is public; every `/rest` call needs a session or an API key. Swagger UI, which the API serves at its own root, is not exposed. Reachability (LAN, domain, Tor) is the user's choice on the Interfaces tab.
+All three interfaces share one binding. The app proxies `/api/*`, `/rest/*` and `/openapi.json` to the API, so the MCP endpoint, the tRPC surface, the REST bridge and the OpenAPI document are on the web app's origin. The OpenAPI document is public and lists only the paths this origin serves; every `/rest` call needs a session or an API key. Swagger UI, which the API serves at its own root, is not exposed. Reachability (LAN, domain, Tor) is the user's choice on the Interfaces tab.
 
 ## Actions (StartOS UI)
 

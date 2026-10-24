@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
+import { SalesRequestStatus } from "@crm/db/enums";
 import { approvedSalesProfile } from "@crm/validation/sales";
 import { type SalesActor, SalesService } from "../src/sales/sales.service";
 
@@ -109,6 +110,15 @@ describe("the sales review queue", () => {
 	});
 });
 
+describe("the sales request status enum", () => {
+	it("has the same order in the database as in the schema", async () => {
+		const [row] = await db.$queryRaw<{ values: string[] }[]>`
+			SELECT enum_range(NULL::"SalesRequestStatus")::text[] AS values
+		`;
+		expect(row?.values).toEqual(Object.values(SalesRequestStatus));
+	});
+});
+
 describe("rejecting a sales proposal", () => {
 	it("refuses an API key, because only a person decides", async () => {
 		const proposal = await newProposal();
@@ -140,6 +150,13 @@ describe("rejecting a sales proposal", () => {
 		expect(first.rejectedSessionId).toBe(sessionId);
 		expect(first.rejectionReason).toBe("The note is about a different Dana.");
 		expect(second.rejectedAt?.getTime()).toBe(first.rejectedAt?.getTime());
+		await expect(
+			service.rejectProposal(human, { ...rejection, reason: "Duplicate" }),
+		).rejects.toThrow("already rejected with another reason");
+		const stored = await db.salesProposal.findUniqueOrThrow({
+			where: { id: proposal.id },
+		});
+		expect(stored.rejectionReason).toBe("The note is about a different Dana.");
 
 		const request = await db.salesRequest.findUniqueOrThrow({
 			where: { id: proposal.requestId },

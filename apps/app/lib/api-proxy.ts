@@ -1,4 +1,9 @@
 import { connection } from "next/server";
+import {
+	downstreamResponseHeaders,
+	isProxiedPath,
+	upstreamRequestHeaders,
+} from "@/lib/api-proxy-request";
 import { bufferedProxyResponse } from "@/lib/api-proxy-response";
 import { API_URL } from "@/lib/env";
 
@@ -6,27 +11,13 @@ export async function proxyToApi(request: Request): Promise<Response> {
 	await connection();
 
 	const url = new URL(request.url);
+	if (!isProxiedPath(url.pathname))
+		return Response.json({ error: "Not found." }, { status: 404 });
 	const target = `${API_URL}${url.pathname}${url.search}`;
-
-	const headers = new Headers(request.headers);
-	for (const header of [
-		"host",
-		"x-forwarded-host",
-		"x-forwarded-proto",
-		"x-forwarded-for",
-		"forwarded",
-		"transfer-encoding",
-		"connection",
-		"keep-alive",
-		"content-length",
-		"expect",
-	]) {
-		headers.delete(header);
-	}
 
 	const init: RequestInit & { duplex?: "half" } = {
 		method: request.method,
-		headers,
+		headers: upstreamRequestHeaders(request.headers),
 		redirect: "manual",
 	};
 
@@ -51,23 +42,7 @@ export async function proxyToApi(request: Request): Promise<Response> {
 		);
 	}
 
-	const responseHeaders = new Headers(upstream.headers);
-	for (const header of [
-		"transfer-encoding",
-		"connection",
-		"content-encoding",
-		"content-length",
-	]) {
-		responseHeaders.delete(header);
-	}
-
-	const setCookies = upstream.headers.getSetCookie?.() ?? [];
-	if (setCookies.length > 0) {
-		responseHeaders.delete("set-cookie");
-		for (const cookie of setCookies) {
-			responseHeaders.append("set-cookie", cookie);
-		}
-	}
+	const responseHeaders = downstreamResponseHeaders(upstream.headers);
 
 	if (
 		upstream.headers.get("content-type")?.includes("text/event-stream") ||

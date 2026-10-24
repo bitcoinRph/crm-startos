@@ -154,6 +154,18 @@ The web app proxies `/openapi.json` and `/rest/*` to the API with the same
 handler as `/api/*` (`apps/app/lib/api-proxy.ts`), and `proxy.ts` lets both
 through without a session, because the API authenticates every `/rest` call.
 On StartOS, where only the web origin is exposed, this is the REST surface.
+The proxy forwards only `/api`, `/rest` and `/openapi.json`
+(`PROXIED_PATHS` in `apps/app/lib/api-proxy-request.ts`), and the web
+`/openapi.json` route keeps only those paths, so every path a client reads there
+is reachable there. Nest's root controllers (`/health`, `/auth/*`, `/internal/*`)
+stay in the API's own document only.
+
+trpc-to-openapi routes a request to the first path pattern that matches, in
+procedure order. `restBridgeRouter` in `apps/api/src/trpc/openapi.ts` sorts the
+procedures so a static segment is tried before a `{parameter}` at the same
+position: `/sales/requests/review-queue` before `/sales/requests/{requestId}`.
+Declare REST paths in any order; the mcp-bridge spec checks that every path
+reaches its own procedure.
 `createApp` builds both halves and merges them, so nothing is generated at build
 time and no file is checked in — the document is whatever the routers are.
 

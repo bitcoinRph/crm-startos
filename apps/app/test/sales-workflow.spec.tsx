@@ -33,7 +33,12 @@ const request: SalesRequest = {
 function render(
 	value: SalesRequest,
 	approving = false,
-	extra: { stalled?: boolean } = {},
+	extra: {
+		stalled?: boolean;
+		checking?: boolean;
+		rejecting?: boolean;
+		decidedHere?: boolean;
+	} = {},
 ) {
 	return renderToStaticMarkup(
 		createElement(SalesRequestReview, {
@@ -141,6 +146,31 @@ describe("fixed sales workflow review", () => {
 		expect(html).toContain("Different Dana");
 		expect(html).not.toContain("Approve proposal");
 		expect(html).not.toContain("Reject proposal");
+	});
+	it("shows that a manual check is running", () => {
+		const html = render(request, false, { stalled: true, checking: true });
+		expect(html).toContain("Checking…");
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*Checking…/);
+	});
+	it("locks both decisions while one of them runs", () => {
+		const html = render(proposed(), false, { rejecting: true });
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Approve proposal/);
+		expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject proposal/);
+	});
+	it("lets the decision result take focus after a decision on this page", () => {
+		const html = render(
+			proposed({
+				rejectedAt: "2026-09-22T00:05:00.000Z",
+				rejectedById: "human",
+				rejectedSessionId: "session",
+				rejectionReason: "Different Dana",
+			}),
+			false,
+			{ decidedHere: true },
+		);
+		expect(html).toMatch(
+			/<p[^>]*role="status"[^>]*tabindex="-1"[^>]*>Rejected/,
+		);
 	});
 	it("says when the page stopped waiting for the agent", () => {
 		const html = render(request, false, { stalled: true });

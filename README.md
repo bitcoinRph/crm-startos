@@ -11,10 +11,10 @@
   <img alt="stars" height="21" src="https://afterglow.watch/badge/trycompai/crm">
 </p>
 
-<h1 align="center">CRM</h1>
+<h1 align="center">Freehold AI CRM</h1>
 
 <p align="center">
-  <strong>Comp AI CRM is an open source, CRM designed for AI agents.</strong><br>
+  <strong>Freehold AI CRM is the Freehold AI fork of <a href="https://github.com/trycompai/crm">Comp AI CRM</a>, an open source CRM designed for AI agents.</strong><br>
   Agentic-first CRM.
 </p>
 
