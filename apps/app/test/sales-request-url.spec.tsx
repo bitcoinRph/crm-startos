@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { useQueryClient } from "@tanstack/react-query";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { renderToStaticMarkup } from "react-dom/server";
+import { SalesReviewQueue } from "../app/(app)/[slug]/sales/sales-review-queue";
 import {
 	type SalesRequest,
 	SalesWorkflow,
@@ -33,7 +34,15 @@ const request: SalesRequest = {
 	proposal: null,
 };
 
-function SeedRequest({ value, error }: { value: SalesRequest; error?: Error }) {
+function SeedRequest({
+	value,
+	error,
+	checkedAt,
+}: {
+	value: SalesRequest;
+	error?: Error;
+	checkedAt?: number;
+}) {
 	const trpc = useTRPC();
 	const client = useQueryClient();
 	const queryKey = trpc.sales.getRequest.queryKey({ requestId: value.id });
@@ -44,22 +53,47 @@ function SeedRequest({ value, error }: { value: SalesRequest; error?: Error }) {
 			.build(client, { queryKey })
 			.setState({ status: "error", error });
 	} else {
-		client.setQueryData(queryKey, value);
+		client.setQueryData(queryKey, value, { updatedAt: checkedAt });
 	}
 	return <SalesWorkflow />;
 }
 
-function render(searchParams: string, value = request, error?: Error) {
+function render(
+	searchParams: string,
+	value = request,
+	error?: Error,
+	checkedAt?: number,
+) {
 	return renderToStaticMarkup(
 		<NuqsTestingAdapter searchParams={searchParams}>
 			<TRPCReactProvider>
-				<SeedRequest value={value} error={error} />
+				<SeedRequest value={value} error={error} checkedAt={checkedAt} />
 			</TRPCReactProvider>
 		</NuqsTestingAdapter>,
 	);
 }
 
 describe("sales request URL recovery", () => {
+	it("calls a request stalled from the last check, not from the render time", () => {
+		const created = Date.parse(request.createdAt);
+		const early = render(
+			`?requestId=${request.id}`,
+			request,
+			undefined,
+			created + SALES_WORKFLOW.pollTimeoutMs - 1,
+		);
+		expect(early).toContain("This page updates by itself.");
+		expect(early).not.toContain("No proposal after");
+		const late = render(
+			`?requestId=${request.id}`,
+			request,
+			undefined,
+			created + SALES_WORKFLOW.pollTimeoutMs + 1,
+		);
+		expect(late).toContain("No proposal after");
+		expect(late).toContain("Check again");
+	});
+
 	it("restores a pending request from a copied URL on each mount", () => {
 		for (let mount = 0; mount < 2; mount++) {
 			const html = render(`?requestId=${request.id}`);
@@ -100,7 +134,7 @@ describe("sales request URL recovery", () => {
 	});
 });
 
-function SeedQueue() {
+function SeedQueue({ disabled = false }: { disabled?: boolean }) {
 	const trpc = useTRPC();
 	const client = useQueryClient();
 	client.setQueryData(
@@ -110,6 +144,8 @@ function SeedQueue() {
 			counts: { pending: 1, proposed: 0 },
 		},
 	);
+	if (disabled)
+		return <SalesReviewQueue activeId="" disabled onOpen={() => {}} />;
 	return <SalesWorkflow />;
 }
 
@@ -127,5 +163,20 @@ describe("sales review queue", () => {
 		expect(html).toContain('data-status="PENDING"');
 		expect(html).toContain("0 proposals to review · 1 request waiting");
 		expect(html).toContain("Synthetic Buyer");
+	});
+
+	it("locks every row while a decision on the page is running", () => {
+		const html = renderToStaticMarkup(
+			<NuqsTestingAdapter searchParams="">
+				<TRPCReactProvider>
+					<SeedQueue disabled />
+				</TRPCReactProvider>
+			</NuqsTestingAdapter>,
+		);
+		expect(html).toContain('aria-disabled="true"');
+		expect(html).toMatch(
+			/<button[^>]*disabled=""[^>]*data-slot="simple-table-row-button"|<button[^>]*data-slot="simple-table-row-button"[^>]*disabled=""/,
+		);
+		expect(html).not.toContain("cursor-pointer [&amp;&gt;td");
 	});
 });

@@ -1562,8 +1562,8 @@ enum SalesRequestStatus {
   PENDING
   PROPOSED
   APPROVED
-  REJECTED
   FAILED
+  REJECTED
 }
 
 model SalesRequest {

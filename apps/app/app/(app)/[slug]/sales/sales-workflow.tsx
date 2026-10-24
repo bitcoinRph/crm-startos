@@ -48,6 +48,7 @@ import { Textarea } from "@crm/ui/components/textarea";
 import {
 	approvedSalesProfile,
 	SALES_PROFILES,
+	SALES_REJECTION_REASON_MAX,
 	type SalesOperation,
 	type SalesProfile,
 } from "@crm/validation/sales";
@@ -86,11 +87,15 @@ const OPERATION_LABEL = {
 
 const DATE_TIME = { dateStyle: "medium", timeStyle: "short" } as const;
 
-function stalled(request: SalesRequest | undefined) {
+function stalled(request: SalesRequest | undefined, checkedAt: number) {
 	return (
 		request?.status === "PENDING" &&
-		Date.now() - Date.parse(request.createdAt) > SALES_WORKFLOW.pollTimeoutMs
+		checkedAt - Date.parse(request.createdAt) > SALES_WORKFLOW.pollTimeoutMs
 	);
+}
+
+function focusOnMount(node: HTMLElement | null) {
+	node?.focus();
 }
 
 function fullName(person: { firstName: string; lastName: string | null }) {
@@ -143,7 +148,7 @@ function SalesWorkflowContent({
 				refetchInterval: (query) =>
 					!query.state.error &&
 					(!query.state.data || query.state.data.status === "PENDING") &&
-					!stalled(query.state.data)
+					!stalled(query.state.data, query.state.dataUpdatedAt)
 						? SALES_WORKFLOW.pollIntervalMs
 						: false,
 			},
@@ -156,6 +161,9 @@ function SalesWorkflowContent({
 					trpc.sales.getRequest.queryKey({ requestId: result.id }),
 					result,
 				);
+				void queryClient.invalidateQueries({
+					queryKey: trpc.sales.reviewQueue.pathKey(),
+				});
 				setRequestId(result.id);
 			},
 		}),
@@ -168,6 +176,9 @@ function SalesWorkflowContent({
 						queryKey: trpc.sales.getRequest.queryKey({ requestId }),
 					}),
 					queryClient.invalidateQueries({ queryKey: trpc.contacts.pathKey() }),
+					queryClient.invalidateQueries({
+						queryKey: trpc.sales.reviewQueue.pathKey(),
+					}),
 				]);
 			},
 		}),
@@ -219,7 +230,11 @@ function SalesWorkflowContent({
 				</div>
 			)}
 			{!active && (
-				<SalesReviewQueue activeId={requestId} onOpen={setRequestId} />
+				<SalesReviewQueue
+					activeId={requestId}
+					disabled={busy}
+					onOpen={setRequestId}
+				/>
 			)}
 			{!active && (
 				<Card>
@@ -360,7 +375,9 @@ function SalesWorkflowContent({
 					request={request.data}
 					approving={approve.isPending || approve.isSuccess || request.isError}
 					rejecting={reject.isPending || reject.isSuccess || request.isError}
-					stalled={stalled(request.data)}
+					stalled={stalled(request.data, request.dataUpdatedAt)}
+					checking={request.isFetching}
+					decidedHere={approve.isSuccess || reject.isSuccess}
 					onCheckAgain={() => void request.refetch()}
 					onApprove={() => {
 						const proposal = request.data?.proposal;
@@ -398,7 +415,11 @@ function SalesWorkflowContent({
 				</div>
 			)}
 			{active && (
-				<SalesReviewQueue activeId={requestId} onOpen={setRequestId} />
+				<SalesReviewQueue
+					activeId={requestId}
+					disabled={busy}
+					onOpen={setRequestId}
+				/>
 			)}
 			<form
 				className="flex flex-col gap-2 border-t pt-6"
@@ -492,7 +513,7 @@ function RejectProposalDialog({
 							id={reasonId}
 							required
 							value={reason}
-							maxLength={SALES_WORKFLOW.rejectionReasonMaxLength}
+							maxLength={SALES_REJECTION_REASON_MAX}
 							onChange={(event) => setReason(event.target.value)}
 							placeholder="The note is about a different person."
 							rows={3}
@@ -522,6 +543,8 @@ export function SalesRequestReview({
 	approving,
 	rejecting = false,
 	stalled = false,
+	checking = false,
+	decidedHere = false,
 	onApprove,
 	onReject = () => {},
 	onCheckAgain = () => {},
@@ -530,6 +553,8 @@ export function SalesRequestReview({
 	approving: boolean;
 	rejecting?: boolean;
 	stalled?: boolean;
+	checking?: boolean;
+	decidedHere?: boolean;
 	onApprove: () => void;
 	onReject?: (reason: string) => void;
 	onCheckAgain?: () => void;
@@ -591,8 +616,14 @@ export function SalesRequestReview({
 								different profile.
 							</AlertDescription>
 							<div>
-								<Button variant="outline" size="sm" onClick={onCheckAgain}>
-									Check again
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={checking}
+									onClick={onCheckAgain}
+								>
+									{checking ? <Spinner data-icon="inline-start" /> : null}
+									{checking ? "Checking…" : "Check again"}
 								</Button>
 							</div>
 						</Alert>
@@ -651,7 +682,12 @@ export function SalesRequestReview({
 					)}
 
 					{proposal?.rejectedAt && (
-						<p role="status" className="text-sm">
+						<p
+							ref={decidedHere ? focusOnMount : undefined}
+							role="status"
+							tabIndex={-1}
+							className="text-sm"
+						>
 							Rejected{" "}
 							<LocalDateTime date={proposal.rejectedAt} options={DATE_TIME} />.
 							No CRM record changed. Reason:{" "}
@@ -660,7 +696,12 @@ export function SalesRequestReview({
 					)}
 
 					{proposal?.approvedAt && (
-						<p role="status" className="text-sm">
+						<p
+							ref={decidedHere ? focusOnMount : undefined}
+							role="status"
+							tabIndex={-1}
+							className="text-sm"
+						>
 							Approved{" "}
 							<LocalDateTime date={proposal.approvedAt} options={DATE_TIME} />.
 							Applied activity IDs:{" "}
