@@ -21,6 +21,7 @@ import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { DealStageMenu } from "@/components/crm/stage-change";
 import { ListSearch } from "@/components/data-table/list-search";
+import { SavedViewsMenu } from "@/components/data-table/saved-views-menu";
 import { useTableQuery } from "@/components/data-table/use-table-query";
 import { LocalDay, LocalRelativeTime } from "@/components/local-date-time";
 import { DEAL_STAGE_OPTIONS } from "@/lib/deal-stage";
@@ -148,7 +149,8 @@ export function DealsTable() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
 	const prefetchRecord = usePrefetchRecord();
-	const { query, input, setArchived } = useTableQuery(dealsSearchParams);
+	const table = useTableQuery(dealsSearchParams);
+	const { query, input, setArchived } = table;
 
 	const deals = useQuery({
 		...trpc.deals.list.queryOptions(input),
@@ -232,15 +234,18 @@ export function DealsTable() {
 			query={query}
 			search={<ListSearch placeholder="Search deals by name or company…" />}
 			actions={
-				<Button
-					variant={input.archived ? "contrast" : "outline"}
-					size="sm"
-					className="justify-start sm:justify-center"
-					onClick={() => toggleArchived(!input.archived)}
-				>
-					<Archive data-icon="inline-start" />
-					Archived
-				</Button>
+				<>
+					<SavedViewsMenu entity="DEAL" table={table} />
+					<Button
+						variant={input.archived ? "contrast" : "outline"}
+						size="sm"
+						className="justify-start sm:justify-center"
+						onClick={() => toggleArchived(!input.archived)}
+					>
+						<Archive data-icon="inline-start" />
+						Archived
+					</Button>
+				</>
 			}
 			columns={columns}
 			rows={rows}
