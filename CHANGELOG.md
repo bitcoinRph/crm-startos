@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.1](https://github.com/bitcoinRph/crm-startos/compare/v1.20.0...v1.20.1) (2026-10-24)
+
+
+### Fixes
+
+* **app:** make the deal board, sales proposals and CSV import usable by reps and agents ([#46](https://github.com/bitcoinRph/crm-startos/issues/46)) ([6a4ab4d](https://github.com/bitcoinRph/crm-startos/commit/6a4ab4dc1d597ac370036002aaa6e7844fe626eb))
+
 ## [1.20.0](https://github.com/bitcoinRph/crm-startos/compare/v1.19.0...v1.20.0) (2026-10-24)
 
 
