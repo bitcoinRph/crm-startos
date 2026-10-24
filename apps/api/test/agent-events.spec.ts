@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
+import { BRAND } from "@crm/env/brand";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
@@ -173,7 +174,7 @@ describe("CRM agent events", () => {
 				},
 				select: { reason: true },
 			}),
-		).toEqual([{ reason: "Add Comp AI to #deal-room" }]);
+		).toEqual([{ reason: `Add ${BRAND.slackApp} to #deal-room` }]);
 	});
 
 	it("rolls back the record when its event cannot commit", async () => {

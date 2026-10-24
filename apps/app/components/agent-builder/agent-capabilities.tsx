@@ -3,6 +3,7 @@
 import Add from "@carbon/icons-react/es/Add";
 import Close from "@carbon/icons-react/es/Close";
 import Warning from "@carbon/icons-react/es/Warning";
+import { BRAND } from "@crm/env/brand";
 import { Alert, AlertDescription, AlertTitle } from "@crm/ui/components/alert";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -83,7 +84,7 @@ export function AgentCapabilities({
 		trpc.slack.joinChannel.mutationOptions({
 			onSuccess: async () => {
 				await channels.reload();
-				toast.success("Asked someone to invite Comp AI.");
+				toast.success(`Asked someone to invite ${BRAND.slackApp}.`);
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -166,7 +167,7 @@ export function AgentCapabilities({
 							</CreateChannelDialog>
 						) : null
 					}
-					summary="One channel. Comp AI joins it when you save."
+					summary={`One channel. ${BRAND.slackApp} joins it when you save.`}
 					title="Lives in"
 				>
 					<ChannelPicker
@@ -286,7 +287,7 @@ export function AgentCapabilities({
 				description={
 					blocked ??
 					(channelChanged
-						? `Comp AI joins #${to}. It stays in #${from} until you remove it.`
+						? `${BRAND.slackApp} joins #${to}. It stays in #${from} until you remove it.`
 						: "The old version stays in the history.")
 				}
 				open={dirty}

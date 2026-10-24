@@ -1,4 +1,5 @@
 import type { Prisma } from "@crm/db";
+import { BRAND } from "@crm/env/brand";
 import { parse, schemas } from "@crm/validation";
 import { joinSlackChannel } from "./slack-membership";
 
@@ -14,9 +15,9 @@ export async function runSlackChannelJoin(
 
 	if (outcome.joined) {
 		return outcome.already
-			? `Comp AI was already in #${channelName}.`
-			: `Comp AI joined #${channelName}.`;
+			? `${BRAND.slackApp} was already in #${channelName}.`
+			: `${BRAND.slackApp} joined #${channelName}.`;
 	}
 
-	return `Comp AI could not join #${channelName}. ${outcome.reason}`;
+	return `${BRAND.slackApp} could not join #${channelName}. ${outcome.reason}`;
 }

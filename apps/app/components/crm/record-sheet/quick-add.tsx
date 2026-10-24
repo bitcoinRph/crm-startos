@@ -1,5 +1,7 @@
 "use client";
 
+import { BRAND } from "@crm/env/brand";
+
 import { Button } from "@crm/ui/components/button";
 import { DatePicker } from "@crm/ui/components/date-picker";
 import { Field, FieldLabel } from "@crm/ui/components/field";
@@ -315,7 +317,7 @@ export function QuickAddDeal({
 					autoFocus
 					value={name}
 					onChange={(event) => setName(event.target.value)}
-					placeholder={`${companyName} — Comp AI`}
+					placeholder={`${companyName} — ${BRAND.company}`}
 					autoComplete="off"
 				/>
 			</Field>

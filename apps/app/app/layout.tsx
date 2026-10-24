@@ -1,3 +1,4 @@
+import { BRAND } from "@crm/env/brand";
 import "@crm/ui/globals.css";
 import { Toaster } from "@crm/ui/components/sonner";
 import { TooltipProvider } from "@crm/ui/components/tooltip";
@@ -21,10 +22,10 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	title: {
-		default: "Comp AI - CRM",
-		template: "%s · Comp AI CRM",
+		default: BRAND.product,
+		template: `%s · ${BRAND.product}`,
 	},
-	description: "Customer Relationship Management for Comp AI",
+	description: `Customer Relationship Management for ${BRAND.company}`,
 };
 
 export default function RootLayout({

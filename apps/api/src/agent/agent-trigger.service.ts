@@ -3,6 +3,7 @@ import { PRIORITY } from "@crm/db/agent-tasks";
 import { CRM_EVENT_CATALOG, type CrmEventType } from "@crm/db/crm-events";
 import { RECORD_ID_COLUMNS } from "@crm/db/fields";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
+import { BRAND } from "@crm/env/brand";
 import { fieldBackfillPayload } from "@crm/validation/field-backfill";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
@@ -176,7 +177,7 @@ export class AgentTriggerService {
 		return this.enqueue(
 			{
 				kind: "slack-channel-join",
-				reason: `Add Comp AI to #${channelName}`,
+				reason: `Add ${BRAND.slackApp} to #${channelName}`,
 				priority: PRIORITY.slackJoin,
 				budget: 1,
 				subject: { path: ["channelId"], value: channelId },
