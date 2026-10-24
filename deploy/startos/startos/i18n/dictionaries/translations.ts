@@ -61,6 +61,8 @@ export default {
     59: 'El ID del modelo debe empezar con una letra o número y contener solo letras, números, puntos, guiones bajos, dos puntos, barras y guiones.',
     62: 'Tokens máximos de salida',
     63: 'Número máximo de tokens que el modelo generará por respuesta. Debe estar entre 1 y 1024.',
+    64: 'API REST',
+    65: 'Documento OpenAPI de la API del CRM. Las herramientas llaman a /rest en esta dirección con una clave de API del CRM desde Ajustes.',
   },
   de_DE: {
     0: 'Vercel-AI-Gateway-Schlüssel',
@@ -119,9 +121,11 @@ export default {
     53: 'Führt den Recherche-Agenten auf dem auf diesem Server installierten Ollama-Dienst statt über die Cloud-Anbindung aus. Installieren Sie Ollama aus dem Marketplace, laden Sie das Modell und tragen Sie hier seine ID ein. Nichts fällt auf die Cloud zurück.',
     57: 'Modell-ID',
     58: 'Der im Ollama-Dienst geladene Modell-Tag, zum Beispiel qwen3.5:4b. Exakte Übereinstimmung. Leer lassen, um die lokale Inferenz auszuschalten.',
-    59: 'Die Modell-ID muss mit einem Buchstaben oder einer Zahl beginnen und darf nur Buchstaben, Zahlen, Punkte, Unterschiede, Doppelpunkte, Slashes und Bindestriche enthalten.',
+    59: 'Die Modell-ID muss mit einem Buchstaben oder einer Zahl beginnen und darf nur Buchstaben, Zahlen, Punkte, Unterstriche, Doppelpunkte, Slashes und Bindestriche enthalten.',
     62: 'Maximale Ausgabetokens',
     63: 'Maximale Tokens, die das Modell pro Antwort generiert. Muss zwischen 1 und 1024 liegen.',
+    64: 'REST-API',
+    65: 'OpenAPI-Dokument der CRM-API. Werkzeuge rufen /rest unter dieser Adresse mit einem CRM-API-Schlüssel aus den Einstellungen auf.',
   },
   pl_PL: {
     0: 'Klucz Vercel AI Gateway',
@@ -183,6 +187,8 @@ export default {
     59: 'ID modelu musi zaczynać się od litery lub cyfry i zawierać tylko litery, cyfry, kropki, podkreślenia, dwukropki, ukośniki i myślniki.',
     62: 'Maksymalna liczba tokenów wyjściowych',
     63: 'Maksymalna liczba tokenów, które model wygeneruje na odpowiedź. Musi zawierać się między 1 a 1024.',
+    64: 'REST API',
+    65: 'Dokument OpenAPI interfejsu API CRM. Narzędzia wywołują /rest pod tym adresem z kluczem API CRM z Ustawień.',
   },
   fr_FR: {
     0: 'Clé Vercel AI Gateway',
@@ -244,5 +250,7 @@ export default {
     59: 'L’ID du modèle doit commencer par une lettre ou un chiffre et contenir uniquement des lettres, chiffres, points, soulignés, deux-points, barres et traits d’union.',
     62: 'Tokens de sortie max',
     63: 'Nombre maximal de tokens que le modèle générera par réponse. Doit être compris entre 1 et 1024.',
+    64: 'API REST',
+    65: 'Document OpenAPI de l’API du CRM. Les outils appellent /rest à cette adresse avec une clé API du CRM depuis les Paramètres.',
   },
 } satisfies Record<string, LangDict>

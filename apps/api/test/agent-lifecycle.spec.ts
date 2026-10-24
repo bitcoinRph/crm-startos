@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ID } from "@crm/auth";
 import { db, type Prisma } from "@crm/db";
 import { workspaceSlug } from "@crm/db/workspace";
+import { BRAND } from "@crm/env/brand";
 import { AgentAccessService } from "../src/agent/agent-access.service";
 import { AgentDefinitionsService } from "../src/agent/agent-definitions.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
@@ -12,7 +13,7 @@ const teammateId = `agent-lifecycle-teammate-${suffix}`;
 const memberId = `agent-lifecycle-member-${suffix}`;
 const teammateMemberId = `agent-lifecycle-teammate-member-${suffix}`;
 const joinChannel = `renewals-${suffix}`;
-const joinReason = `Add Comp AI to #${joinChannel}`;
+const joinReason = `Add ${BRAND.slackApp} to #${joinChannel}`;
 const access = new AgentAccessService(db);
 const agents = new AgentDefinitionsService(
 	db,

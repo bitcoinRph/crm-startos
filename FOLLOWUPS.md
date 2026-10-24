@@ -53,9 +53,10 @@ Implemented in this branch; `docs/codex.md` is the reference. What is left:
 
 - Point OpenWebUI at the same Ollama service; nothing in the CRM changes for
   chat.
-- To let OpenWebUI act on the CRM, register the CRM as an OpenAPI tool server:
-  `GET /openapi.json` already describes `/rest`. That needs the API port
-  exposed as a second StartOS interface, or a small proxy route under `/api/`.
+- To let OpenWebUI act on the CRM, register the CRM as an OpenAPI tool server
+  at `<web address>/openapi.json`. The web origin proxies `/openapi.json` and
+  `/rest/*` to the API, and StartOS lists the address as the **REST API**
+  interface. Give OpenWebUI a CRM API key with the narrowest profile it needs.
 - Do this only if you want a chat UI for the local model. It adds an interface
   and a second place keys live.
 

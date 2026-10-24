@@ -11,7 +11,14 @@ const SIGN_IN_PATH = "/sign-in";
 
 const UNGATED = ["/grant-access", "/eve"];
 
-const ANONYMOUS = ["/t", "/media", "/icon", "/apple-icon"];
+const ANONYMOUS = [
+	"/t",
+	"/media",
+	"/icon",
+	"/apple-icon",
+	"/rest",
+	"/openapi.json",
+];
 
 const SECTIONS = ["/companies", "/contacts", "/deals", "/settings"];
 

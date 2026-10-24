@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="icon.svg" alt="CRM Logo" width="21%">
+  <img src="icon.svg" alt="Freehold AI CRM logo" width="21%">
 </p>
 
-# CRM on StartOS
+# Freehold AI CRM on StartOS
 
 > **Upstream docs:** <https://github.com/trycompai/crm#readme>
 >
@@ -10,7 +10,7 @@
 > CRM. If a feature, setting, or behavior is not mentioned here, the upstream
 > documentation is accurate and fully applicable.
 
-[Comp AI CRM](https://github.com/trycompai/crm) is an open source, single-tenant CRM whose research agent fills in what it can prove about companies and contacts. This package runs the whole stack on one StartOS service and adds what a private server needs: a password sign-in, a scheduler for the routes Vercel Cron would call, and an MCP endpoint for AI agents.
+Freehold AI CRM is this fork of [Comp AI CRM](https://github.com/trycompai/crm), an open source, single-tenant CRM whose research agent fills in what it can prove about companies and contacts. This package runs the whole stack on one StartOS service and adds what a private server needs: a password sign-in, a scheduler for the routes Vercel Cron would call, and an MCP endpoint for AI agents.
 
 ---
 
@@ -46,7 +46,7 @@ Five daemons and three oneshots run from those two images, in this order:
 | Name | Kind | Command | Purpose |
 | --- | --- | --- | --- |
 | `postgres` | daemon | image entrypoint, `listen_addresses=127.0.0.1` | The database, loopback only |
-| `crm-volume-owner` | oneshot (root) | `chown -R node:node` on the agent workflow data, the sandbox cache and `/data/media` | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root |
+| `crm-volume-owner` | oneshot (root) | `find` on the agent workflow data, the sandbox cache and `/data/media`, then `chown -h node:node` on each entry that another user or group owns | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root. Entries that `node` already owns are not written. |
 | `migrate` | oneshot | `bunx prisma migrate deploy` in `packages/db` | Applies pending migrations on every start |
 | `local-account` | oneshot | `bun scripts/local-account.ts` in `apps/api` | Creates or resets the password account from the store |
 | `api` | daemon | `bun dist/main.js` in `apps/api`, port 3001 | NestJS API, tRPC, auth, MCP |
@@ -54,7 +54,7 @@ Five daemons and three oneshots run from those two images, in this order:
 | `agent` | daemon | `bun run start` (`eve start`, port 2000) in `apps/agent` | The eve research agent with its own schedule |
 | `scheduler` | daemon | `node /assets/scheduler.mjs` | Calls the API's `/internal/*` cron routes with `CRON_SECRET` |
 
-Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, runs `chown -R node:node` on the agent workflow data, the sandbox cache and `/data/media` before `migrate` so installs that wrote them as root keep working. `postgres` is unchanged.
+Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, changes the owner of every entry in the agent workflow data, the sandbox cache and `/data/media` that `node` does not already own, before `migrate`, so installs that wrote them as root keep working. `postgres` is unchanged.
 
 Only port 3000 is bound to an interface. The API and the agent are reachable on loopback inside the container only; the agent's `/eve/v1/*` routes accept any loopback request without a token, so the agent port must never be exposed.
 
@@ -101,8 +101,9 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | --- | --- | --- | --- | --- |
 | Web UI | 3000 | HTTP behind the StartOS proxy | `/` | The CRM |
 | MCP | 3000 | HTTP behind the StartOS proxy | `/api/mcp` | Streamable HTTP MCP endpoint, authenticated with a CRM API key |
+| REST API | 3000 | HTTP behind the StartOS proxy | `/openapi.json` | OpenAPI document of the API. Tools call `/rest/*` on the same address with a CRM API key (`x-api-key` or `Authorization: Bearer`) |
 
-Both interfaces share one binding; the app proxies `/api/*` to the API, so the MCP endpoint and the tRPC/REST surface are on the web app's origin. Reachability (LAN, domain, Tor) is the user's choice on the Interfaces tab.
+All three interfaces share one binding. The app proxies `/api/*`, `/rest/*` and `/openapi.json` to the API, so the MCP endpoint, the tRPC surface, the REST bridge and the OpenAPI document are on the web app's origin. The OpenAPI document is public; every `/rest` call needs a session or an API key. Swagger UI, which the API serves at its own root, is not exposed. Reachability (LAN, domain, Tor) is the user's choice on the Interfaces tab.
 
 ## Actions (StartOS UI)
 
@@ -193,7 +194,7 @@ Pull the model inside the Ollama service before naming it here (`ollama pull qwe
 
 ## What Is Unchanged from Upstream
 
-- The web app, the API, the tRPC and REST surfaces, the OpenAPI document and Swagger UI.
+- The web app, the API, the tRPC and REST surfaces and the OpenAPI document. Swagger UI is not exposed on StartOS.
 - The research agent's tools, skills, dispatch schedule, evidence model and Agent tab. Its model route follows the selected inference mode.
 - Google and Microsoft mailbox sync, Slack connection, website tracking, custom fields, saved views, currencies.
 - API keys (Settings → API keys) and the `x-api-key` header; the MCP endpoint reuses them.
@@ -219,6 +220,7 @@ volumes:
 ports:
   ui: 3000
   mcp: 3000 (/api/mcp)
+  rest: 3000 (/openapi.json, calls under /rest)
 dependencies: ollama (optional; required only while Configure Local Inference names a model)
 startos_managed_env_vars:
   - NODE_ENV

@@ -1,3 +1,4 @@
+import { BRAND } from "@crm/env/brand";
 import type * as React from "react";
 
 const LOGO_VIEWBOX = "0 0 56 56";
@@ -51,7 +52,7 @@ const Logo = ({
 		viewBox={LOGO_VIEWBOX}
 		fill="none"
 		role="img"
-		aria-label="CRM logo"
+		aria-label={`${BRAND.product} logo`}
 		data-slot="logo"
 		{...props}
 	>
