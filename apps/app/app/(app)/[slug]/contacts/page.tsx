@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { ExportCsvButton } from "@/components/crm/export-csv-button";
+import { ImportCsvDialog } from "@/components/crm/import-csv-dialog";
 import {
 	PageShell,
 	PageShellActions,
@@ -32,6 +34,8 @@ export default function ContactsPage({
 					<PageShellDescription>Everyone in the pipeline.</PageShellDescription>
 				</PageShellHeading>
 				<PageShellActions>
+					<ImportCsvDialog entity="contacts" />
+					<ExportCsvButton entity="contacts" />
 					<CreateContactSheet />
 				</PageShellActions>
 			</PageShellHeader>

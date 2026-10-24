@@ -206,4 +206,10 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		description:
 			"The custom field definitions of an entity (COMPANY, CONTACT or DEAL), with the keys that update tools accept under data.fields.",
 	},
+	{
+		name: "export_csv",
+		procedure: "csv.export",
+		description:
+			"Export every active (not archived) record of one entity as CSV text. entity is companies, contacts or deals. Custom fields are extra field:<key> columns. Deal amounts are in major units, such as 1234.50, beside a currency column. Cells that start with = + - @ get a leading single quote. Returns csv, rows and truncated, which is true when the row cap cut the export short.",
+	},
 ];
