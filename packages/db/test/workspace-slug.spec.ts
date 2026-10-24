@@ -9,6 +9,7 @@ import {
 describe("workspaceSlug", () => {
 	it("is the company name a rep can read in the address bar", () => {
 		expect(workspaceSlug("Comp AI")).toBe("comp-ai");
+		expect(workspaceSlug("Freehold AI")).toBe("freehold-ai");
 		expect(workspaceSlug("Acme")).toBe("acme");
 		expect(workspaceSlug("Northwind Savings Group")).toBe(
 			"northwind-savings-group",
@@ -28,6 +29,8 @@ describe("workspaceSlug", () => {
 
 		expect(workspaceSlug("Settings")).toBe("settings-crm");
 		expect(workspaceSlug("Sign In")).toBe("sign-in-crm");
+		expect(workspaceSlug("Rest")).toBe("rest-crm");
+		expect(workspaceSlug("Media")).toBe("media-crm");
 	});
 
 	it("falls back rather than producing an empty segment", () => {

@@ -96,7 +96,12 @@ export async function createApp(): Promise<NestExpressApplication> {
 
 			swaggerDocument.paths = {
 				...swaggerDocument.paths,
-				...(trpcDocument.paths as typeof swaggerDocument.paths),
+				...(Object.fromEntries(
+					Object.entries(trpcDocument.paths ?? {}).map(([path, item]) => [
+						`${REST_BRIDGE_PATH}${path}`,
+						item,
+					]),
+				) as typeof swaggerDocument.paths),
 			};
 			swaggerDocument.components = {
 				...swaggerDocument.components,

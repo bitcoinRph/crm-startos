@@ -146,7 +146,14 @@ self-hoster's admin cannot redeploy.
 ## The OpenAPI document is built at runtime, not committed
 
 `GET /openapi.json` serves one document: Nest's own controllers plus a REST bridge
-under `/rest` generated from every tRPC procedure. Swagger UI renders it at `/`.
+under `/rest` generated from every tRPC procedure. Every bridge path in the
+document carries the `/rest` prefix, so a client resolves it against the
+document's own origin. Swagger UI renders it at `/`.
+
+The web app proxies `/openapi.json` and `/rest/*` to the API with the same
+handler as `/api/*` (`apps/app/lib/api-proxy.ts`), and `proxy.ts` lets both
+through without a session, because the API authenticates every `/rest` call.
+On StartOS, where only the web origin is exposed, this is the REST surface.
 `createApp` builds both halves and merges them, so nothing is generated at build
 time and no file is checked in — the document is whatever the routers are.
 
