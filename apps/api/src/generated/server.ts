@@ -29,6 +29,7 @@ import { fieldListInput, fieldListOutput, fieldByKeyInput, serializedFieldOutput
 import { googleConnectionStatusOutput, setAutoCreateInput, suppressDomainInput, suppressDomainOutput, threadInput, emailThreadOutput, calendarEventInput, calendarEventOutput } from "../google/google.contracts";
 import { purgeSyncedDataOutput, revokeAccessOutput, microsoftConnectionStatusOutput, setOutlookAutoCreateInput } from "../microsoft/microsoft.contracts";
 import { intakeSubmitInput, intakeSubmitOutput } from "../intake/intake.contracts";
+import { recordChangesListInput, recordChangesListOutput, recordChangeRevertInput, recordChangeRevertOutput, recordChangeForgetInput, recordChangeForgetOutput } from "../record-changes/record-changes.contracts";
 import { salesRequestInput, salesRequestIdInput, salesSubmitInput, salesApproveInput, salesRejectInput } from "@crm/validation/sales";
 import { salesRequestOutput, salesPendingInput, salesPendingOutput, salesReviewQueueInput, salesReviewQueueOutput, salesProposalOutput } from "../sales/sales.contracts";
 import { savedViewListInput, savedViewListOutput, savedViewCreateInput, savedViewOutput, savedViewUpdateArgs, savedViewIdInput, savedViewDeleteOutput } from "../saved-views/saved-views.contracts";
@@ -637,6 +638,20 @@ const appRouter = t.router({
     setAutoCreate: publicProcedure
       .input(setOutlookAutoCreateInput)
       .output(microsoftConnectionStatusOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
+    }),
+  recordChanges: t.router({
+    list: publicProcedure
+      .input(recordChangesListInput)
+      .output(recordChangesListOutput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    revert: publicProcedure
+      .input(recordChangeRevertInput)
+      .output(recordChangeRevertOutput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any),
+    forget: publicProcedure
+      .input(recordChangeForgetInput)
+      .output(recordChangeForgetOutput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as any)
     }),
   sales: t.router({

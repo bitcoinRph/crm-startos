@@ -1,10 +1,13 @@
 import "@crm/env/load";
 
+import { setDefaultChangeActor } from "@crm/db/change-actor";
 import { onTelemetryProblem, syncVersion } from "@crm/telemetry";
 import { defineAgent } from "eve";
 import { logCapabilities } from "./lib/capabilities";
 import { LOCAL_INFERENCE } from "./lib/inference/config";
 import { inferenceModel } from "./lib/model";
+
+setDefaultChangeActor({ kind: "AGENT" });
 
 void logCapabilities();
 

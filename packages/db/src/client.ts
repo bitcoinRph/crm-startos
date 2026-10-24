@@ -1,6 +1,8 @@
 import "@crm/env/load";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool, type PoolClient, type QueryConfig } from "pg";
+import { changeActorTag, changeExpectationTag } from "./change-actor";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
 
 const connectionString =
@@ -98,9 +100,78 @@ const logDefinitions: Prisma.LogDefinition[] = [
 		: []),
 ];
 
+const SET_CHANGE_CONTEXT =
+	"SELECT set_config('crm.actor', $1, true), set_config('crm.expect', $2, true)";
+const TRANSACTION_START = /^\s*(?:begin|start\s+transaction)\b/i;
+const WRITE_STATEMENT =
+	/^\s*(?:(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)\s*)*(?:insert|update|delete|merge|with)\b/i;
+
+function isWrite(config: QueryConfig): boolean {
+	return WRITE_STATEMENT.test(config.text);
+}
+
+function ignoreClientError(): void {}
+
+function changeActorPool(url: string): Pool {
+	const pool = new Pool({ connectionString: url, allowExitOnIdle: true });
+
+	const transactionClient = (client: PoolClient): PoolClient => {
+		let contextSet = false;
+		return new Proxy(client, {
+			get(target, property, receiver) {
+				if (property !== "query")
+					return Reflect.get(target, property, receiver);
+				return async (config: QueryConfig) => {
+					if (TRANSACTION_START.test(config.text)) contextSet = false;
+					else if (!contextSet && isWrite(config)) {
+						await target.query(SET_CHANGE_CONTEXT, [
+							changeActorTag(),
+							changeExpectationTag(),
+						]);
+						contextSet = true;
+					}
+					return target.query(config);
+				};
+			},
+		});
+	};
+
+	const connectAsActor = async (): Promise<PoolClient> =>
+		transactionClient(await pool.connect());
+
+	const queryAsActor = async (config: QueryConfig) => {
+		if (!isWrite(config)) return pool.query(config);
+		const client = await pool.connect();
+		client.on("error", ignoreClientError);
+		try {
+			await client.query(
+				`BEGIN; SELECT set_config('crm.actor', ${client.escapeLiteral(changeActorTag())}, true), set_config('crm.expect', ${client.escapeLiteral(changeExpectationTag())}, true)`,
+			);
+			const result = await client.query(config);
+			await client.query("COMMIT");
+			client.off("error", ignoreClientError);
+			client.release();
+			return result;
+		} catch (error) {
+			await client.query("ROLLBACK").catch(ignoreClientError);
+			client.off("error", ignoreClientError);
+			client.release(true);
+			throw error;
+		}
+	};
+
+	return new Proxy(pool, {
+		get(target, property, receiver) {
+			if (property === "connect") return connectAsActor;
+			if (property === "query") return queryAsActor;
+			return Reflect.get(target, property, receiver);
+		},
+	});
+}
+
 const createPrismaClient = () => {
 	const client = new PrismaClient({
-		adapter: new PrismaPg({ connectionString }),
+		adapter: new PrismaPg(changeActorPool(connectionString)),
 		log: logDefinitions,
 	});
 

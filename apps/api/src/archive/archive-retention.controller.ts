@@ -26,6 +26,7 @@ import type { EnvironmentVariables } from "../config/env.validation";
 import { ContactsService } from "../contacts/contacts.service";
 import { InjectDatabase } from "../database/database.constants";
 import { DealsService } from "../deals/deals.service";
+import { RecordChangesService } from "../record-changes/record-changes.service";
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -48,6 +49,7 @@ export class ArchiveRetentionController {
 		private readonly contacts: ContactsService,
 		private readonly deals: DealsService,
 		private readonly apiKeyAudit: ApiKeyAuditService,
+		private readonly recordChanges: RecordChangesService,
 		config: ConfigService<EnvironmentVariables, true>,
 	) {
 		this.secret = config.get("CRON_SECRET", { infer: true });
@@ -85,12 +87,14 @@ export class ArchiveRetentionController {
 		const retentionDays = await readArchiveRetentionDays(this.db);
 		const before = new Date(Date.now() - retentionDays * DAY_MS);
 
-		const [companies, contacts, deals, apiKeyCalls] = await Promise.all([
-			this.companies.purgeExpired(before),
-			this.contacts.purgeExpired(before),
-			this.deals.purgeExpired(before),
-			this.apiKeyAudit.purgeExpired(before),
-		]);
+		const [companies, contacts, deals, apiKeyCalls, recordChanges] =
+			await Promise.all([
+				this.companies.purgeExpired(before),
+				this.contacts.purgeExpired(before),
+				this.deals.purgeExpired(before),
+				this.apiKeyAudit.purgeExpired(before),
+				this.recordChanges.purgeExpired(before),
+			]);
 
 		this.logger.log({
 			message: "Archive retention swept",
@@ -102,9 +106,17 @@ export class ArchiveRetentionController {
 			deals: deals.succeeded,
 			dealsSkipped: deals.skipped,
 			apiKeyCalls,
+			recordChanges,
 		});
 
-		return { retentionDays, companies, contacts, deals, apiKeyCalls };
+		return {
+			retentionDays,
+			companies,
+			contacts,
+			deals,
+			apiKeyCalls,
+			recordChanges,
+		};
 	}
 }
 

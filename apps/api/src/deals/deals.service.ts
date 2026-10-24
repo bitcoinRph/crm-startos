@@ -504,7 +504,7 @@ export class DealsService {
 		);
 	}
 
-	async setStage(input: SetStageInput, actingUserId: string) {
+	async setStage(input: SetStageInput, actingUserId: string, closedAt?: Date) {
 		const closedReason = input.closedReason?.trim();
 		const closed = isClosedStage(input.stage);
 		const transition = await this.agent.withCrmEvents(async (tx, emit) => {
@@ -541,7 +541,7 @@ export class DealsService {
 				data: {
 					stage: input.stage,
 					stageChangedAt: now,
-					closedAt: closed ? now : null,
+					closedAt: closed ? (closedAt ?? now) : null,
 					closedReason: closed ? (closedReason ?? null) : null,
 				},
 				select: { id: true, stage: true },
