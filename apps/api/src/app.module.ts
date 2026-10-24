@@ -15,6 +15,7 @@ import { validateEnv } from "./config/env.validation";
 import { ContactsModule } from "./contacts/contacts.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { CrmModule } from "./crm/crm.module";
+import { CsvModule } from "./csv/csv.module";
 import { CurrencyModule } from "./currency/currency.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { DatabaseModule } from "./database/database.module";
@@ -62,6 +63,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		CompaniesModule,
 		ContactsModule,
 		ConversationsModule,
+		CsvModule,
 		CurrencyModule,
 		DealsModule,
 		FieldsModule,

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { ExportCsvButton } from "@/components/crm/export-csv-button";
 import {
 	PageShell,
 	PageShellActions,
@@ -38,6 +39,7 @@ export default function DealsPage({
 					</PageShellDescription>
 				</PageShellHeading>
 				<PageShellActions>
+					<ExportCsvButton entity="deals" />
 					<CreateDealSheet />
 				</PageShellActions>
 			</PageShellHeader>

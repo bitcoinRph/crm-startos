@@ -550,6 +550,46 @@ describe("MCP contract", () => {
 		});
 		expect(response.status).toBe(401);
 	});
+
+	it("E1 exports active records as CSV for a read-only key and leaves the rows alone", async () => {
+		await db.company.create({
+			data: {
+				id: `${prefix}-archived-company`,
+				name: `${prefix} archived`,
+				domain: `archived-${prefix}.test`,
+				archivedAt: new Date(),
+			},
+		});
+		const exported = z.object({
+			entity: z.string(),
+			filename: z.string(),
+			csv: z.string(),
+			rows: z.number(),
+			truncated: z.boolean(),
+		});
+		const before = await ownedState();
+		const companies = await read(
+			"export_csv",
+			{ entity: "companies" },
+			exported,
+		);
+		expect(companies.filename).toBe("companies.csv");
+		expect(companies.truncated).toBe(false);
+		expect(companies.csv).toContain(companyId);
+		expect(companies.csv).toContain(`${prefix}.test`);
+		expect(companies.csv).not.toContain(`archived-${prefix}.test`);
+		const contacts = await read("export_csv", { entity: "contacts" }, exported);
+		expect(contacts.csv).toContain(`active@${prefix}.test`);
+		const deals = await read("export_csv", { entity: "deals" }, exported);
+		expect(deals.csv).toContain(dealId);
+		expect(deals.csv).toContain(`${prefix} active`);
+		expect(await ownedState()).toEqual(before);
+		const invalid = await call(reader, {
+			name: "export_csv",
+			arguments: { entity: "users" },
+		});
+		expect(invalid.isError).toBe(true);
+	});
 });
 
 const existingProfileTools = {
@@ -658,22 +698,26 @@ const profileTools = {
 		"resolve_customer",
 		"follow_ups",
 		"intake_submit",
+		"export_csv",
 	],
 	agent_propose: [
 		...existingProfileTools.agent_propose,
 		"resolve_customer",
 		"follow_ups",
+		"export_csv",
 	],
 	agent_read: [
 		...existingProfileTools.agent_read,
 		"resolve_customer",
 		"follow_ups",
+		"export_csv",
 	],
 	legacy: [
 		...existingProfileTools.legacy,
 		"resolve_customer",
 		"follow_ups",
 		"intake_submit",
+		"export_csv",
 	],
 	intake: ["intake_submit"],
 } as const;

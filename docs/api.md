@@ -430,6 +430,37 @@ rates, the supported currencies, the keyless feed, and why the fetcher is the on
 documented exception to *no intelligence in the API* — are in **`docs/currency.md`**.
 Read it before touching any amount, total, chart or rate.
 
+## CSV leaves the CRM the same way it comes in
+
+`apps/api/src/csv`. A rep moving away must be able to take every record along, so
+export is a plain query, and an agent can call it too.
+
+- **`csv.export` takes `entity`** (`companies`, `contacts`, `deals`) and returns
+  `{ entity, filename, csv, rows, truncated }`. The MCP tool is `export_csv`. It is a
+  query, so every key profile may call it, and it carries `readOnlyHint`.
+- **Active records only.** `archivedAt` is null. Archived records never leave.
+- **`CSV.export` (`csv-config.ts`) caps it.** `maxRows` stops the export, `truncated`
+  says so, and `pageSize` is how many rows one read holds. The loop pages by id, so no
+  read is unbounded.
+- **`crm/csv.ts` is the only writer.** RFC 4180: a cell with a comma, a quote, CR or LF
+  is quoted, inner quotes double, lines end in CRLF. A cell that starts with `=`, `+`,
+  `-`, `@`, a tab or a CR gets a leading `'`, so a spreadsheet shows it as text.
+- **Columns come from the update contracts** (`csv-columns.ts`), then one
+  `field:<key>` column per active custom field, in field order. `id`, `source` and
+  `createdAt` are information only.
+  - companies: `id, name, domain, website, description, industry, city, stateCode,
+    country, phone, email, linkedinUrl, ownerEmail, source, createdAt`
+  - contacts: `id, firstName, lastName, email, phone, title, linkedinUrl, twitterUrl,
+    githubUrl, companyDomain, companyName, ownerEmail, source, createdAt`
+  - deals: `id, name, description, companyDomain, companyName, stage, closedReason, amount,
+    currency, expectedCloseDate, ownerEmail, createdAt`
+- **A deal `amount` is in major units** (`1234.50`) beside its `currency`. `baseAmount`
+  never leaves, because it is derived (`docs/currency.md`).
+- **Custom fields are written as people read them.** A SELECT is its option label, a
+  USER is the user's email, a DATE is `YYYY-MM-DD` unless it has a time.
+- **The browser downloads the text it gets back.** The list pages build a `Blob` from
+  the query result with a BOM, so Excel reads UTF-8. There is no download route.
+
 ## Freshness: invalidate the query, don't disable the cache
 
 - **Invalidate in `onSuccess` through `useCrmCache()`** (`lib/trpc/cache.ts`), never by
