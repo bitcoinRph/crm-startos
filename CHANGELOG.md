@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/bitcoinRph/crm-startos/compare/v1.22.1...v1.23.0) (2026-10-24)
+
+
+### Features
+
+* record every record change with its actor and let a person undo it ([#57](https://github.com/bitcoinRph/crm-startos/issues/57)) ([e8df87f](https://github.com/bitcoinRph/crm-startos/commit/e8df87f715f61116fd6212dfdf4b3d0424542870))
+
 ## [1.22.1](https://github.com/bitcoinRph/crm-startos/compare/v1.22.0...v1.22.1) (2026-10-24)
 
 
