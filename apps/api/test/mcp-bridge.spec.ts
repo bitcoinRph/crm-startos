@@ -17,6 +17,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { AnyTRPCProcedure } from "@trpc/server";
 import { getProcedureAtPath } from "@trpc/server/unstable-core-do-not-import";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -36,6 +37,7 @@ import {
 	salesReviewQueueOutput,
 } from "../src/sales/sales.contracts";
 import { SearchService } from "../src/search/search.service";
+import { restBridgeRouter } from "../src/trpc/openapi";
 
 const prefix = `mcp-${randomUUID()}`;
 const companyId = `${prefix}-company`;
@@ -2133,5 +2135,61 @@ describe("MCP deterministic follow-ups", () => {
 		expect(spec.paths["/search/resolve-customer"]).toBeUndefined();
 		expect(spec.paths["/health"]?.get).toBeDefined();
 		expect(await ownedState()).toEqual(before);
+	});
+
+	it("routes every REST path to its own procedure, static segments first", () => {
+		const restRoute = z.object({
+			openapi: z.object({ method: z.string(), path: z.string() }),
+		});
+		const procedures: Record<string, AnyTRPCProcedure> = restBridgeRouter(
+			app.get(AppRouterHost).appRouter,
+		)._def.procedures;
+		const routes = Object.entries(procedures).flatMap(([name, procedure]) => {
+			const parsed = restRoute.safeParse(procedure._def.meta);
+			if (!parsed.success) return [];
+			const { method, path } = parsed.data.openapi;
+			return [
+				{
+					name,
+					method,
+					sample: path.replace(/\{[^}]+\}/g, "sample-value"),
+					pattern: new RegExp(`^${path.replace(/\{[^}]+\}/g, "[^/]+")}$`, "i"),
+				},
+			];
+		});
+		expect(routes.length).toBeGreaterThan(100);
+		const misrouted = routes.flatMap((route) => {
+			const winner = routes.find(
+				(candidate) =>
+					candidate.method === route.method &&
+					candidate.pattern.test(route.sample),
+			);
+			return winner?.name === route.name
+				? []
+				: [`${route.method} ${route.sample} -> ${winner?.name}`];
+		});
+		expect(misrouted).toEqual([]);
+	});
+
+	it("serves static REST paths that share a prefix with a parameter path", async () => {
+		const queue = await fetch(
+			new URL("/rest/sales/requests/review-queue?limit=5", endpoint),
+			{ headers: { "x-api-key": readerKey.key } },
+		);
+		expect(queue.status).toBe(200);
+		expect(
+			z
+				.object({ counts: z.object({ proposed: z.number() }) })
+				.parse(await queue.json()).counts.proposed,
+		).toBeGreaterThanOrEqual(0);
+		const pending = await fetch(
+			new URL("/rest/sales/requests/pending", endpoint),
+			{ headers: { "x-api-key": readerKey.key } },
+		);
+		expect(pending.status).toBe(200);
+		const options = await fetch(new URL("/rest/companies/options", endpoint), {
+			headers: { "x-api-key": readerKey.key },
+		});
+		expect(options.status).toBe(200);
 	});
 });

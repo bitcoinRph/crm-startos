@@ -16,7 +16,7 @@ import {
 import { AppModule } from "./app.module";
 import { ContextLogger } from "./logging/context-logger";
 import { createMcpBridge, MCP_PATH, type McpBridge } from "./mcp/mcp-bridge";
-import { REST_BRIDGE_PATH } from "./trpc/openapi";
+import { REST_BRIDGE_PATH, restBridgeRouter } from "./trpc/openapi";
 import { createBaseTrpcContext } from "./trpc/trpc.context";
 
 export async function createApp(): Promise<NestExpressApplication> {
@@ -123,7 +123,7 @@ export async function createApp(): Promise<NestExpressApplication> {
 	const { appRouter } = app.get(AppRouterHost);
 
 	restBridge = createOpenApiExpressMiddleware({
-		router: appRouter,
+		router: restBridgeRouter(appRouter),
 		createContext: ({ req }) => createBaseTrpcContext(req),
 	});
 
