@@ -140,7 +140,34 @@ Every action writes `store.json`; `main.ts` reads the store with `.const()`, so 
 
 `sdk.Backups.withPgDump` dumps the `crm` database with `pg_dump` and restores it with `pg_restore` into a fresh cluster. The rest of the `main` volume is rsynced with `postgresql/` excluded, so `store.json` and the agent's workflow data travel with the backup.
 
-**Backup path:** `pgdataPath` is set to `/postgresql/data` because the runtime cluster lives at `main/postgresql/data` under `PGDATA=/var/lib/postgresql/data`. Disposable restore tests are not performed on this branch; use a disposable StartOS instance with synthetic data before production restore.
+**Backup path:** `pgdataPath` is set to `/postgresql/data` because the runtime cluster lives at `main/postgresql/data` under `PGDATA=/var/lib/postgresql/data`.
+
+### Restore drill
+
+Run this on a disposable StartOS server with synthetic data only. Never use real customer data. It proves that a backup carries the records, the archive state and the sealed Codex credential.
+
+1. Install the package on the disposable server and run **Set Sign-in Credentials**.
+2. Sign in. In **Settings → API keys**, create one `crm_integration` key and two `agent_propose` keys. Run `scripts/smoke-startos.sh` with them as `ADMIN_KEY`, `HERMES_KEY` and `OPENCLAW_KEY`, so the server holds a synthetic contact and two sales proposals. Archive one contact on the Contacts page.
+3. In **Settings → General → Codex**, connect an OpenAI API key or a ChatGPT account and choose a model. Ask the agent one question on a record and keep the answer.
+4. Record the counts. Run the commands below with `CRM_URL` set and `CRM_KEY` set to the `crm_integration` key, and save the output as `before.txt`:
+
+   ```sh
+   count() {
+     curl -sS "$CRM_URL/api/mcp" -H "Authorization: Bearer $CRM_KEY" \
+       -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+       -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$1\",\"arguments\":{\"pageSize\":1,\"archived\":$2}}}" \
+       | jq -r '.result.content[0].text' | jq -r '.total'
+   }
+   for tool in list_contacts list_companies list_deals; do
+     echo "$tool active=$(count $tool false) archived=$(count $tool true)"
+   done
+   ```
+
+   Also write down the **Connected as** label and the **Since** time from the Codex card.
+5. Create a backup in StartOS. Uninstall the package. Restore it from that backup.
+6. Run the same commands again and save the output as `after.txt`. `diff before.txt after.txt` must print nothing.
+7. Open the Codex card. The label and the **Since** time must match step 4. Ask the agent a new question on the same record. A reply proves that `CRM_SECRETS_KEY` and the sealed credential came back together.
+8. If any step fails, the backup is not trusted. Open an issue with the step number and the output.
 
 ## Local inference
 
