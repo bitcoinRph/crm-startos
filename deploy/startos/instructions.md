@@ -14,7 +14,7 @@ Password sign-in is on, so nothing outside your network is needed to get in. Goo
 
 ## Getting set up
 
-Package 1.21.0:0 renames the CRM to Freehold AI CRM. It adds a review queue and rejection for sales proposals, a value on each deal board column, and the REST API with its OpenAPI document on the web interface. Back up before you update. Downloading a package does not update an installed service.
+Package 1.22.1:0 is Freehold AI CRM. It has a review queue and rejection for sales proposals, a value on each deal board column, and the REST API with its OpenAPI document on the web interface. It fixes REST routes that did not reach their endpoint. Back up before you update. Downloading a package does not update an installed service.
 
 1. Run **Set Sign-in Credentials**. Enter the email address you will use and leave the password empty to generate one. Copy both; the password is shown once.
 2. Start the service and open the **Web UI** interface. Sign in with the email and password from step 1. The first account to sign in owns the workspace.

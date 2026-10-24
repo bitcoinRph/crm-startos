@@ -3,6 +3,7 @@ import Dashboard from "@carbon/icons-react/es/Dashboard";
 import Group from "@carbon/icons-react/es/Group";
 import Partnership from "@carbon/icons-react/es/Partnership";
 import Settings from "@carbon/icons-react/es/Settings";
+import { BRAND } from "@crm/env/brand";
 import Logo from "@crm/ui/components/logo";
 import Image from "next/image";
 import { BuiltWith } from "../built-with";
@@ -61,7 +62,7 @@ function AppHeader() {
 				</span>
 				<span className="mx-1 h-5 w-px shrink-0" />
 				<span className="line-clamp-1 font-medium text-sm/[142%]">
-					Comp AI CRM
+					{BRAND.product}
 				</span>
 			</div>
 

@@ -68,7 +68,7 @@ This file is that new plan. Each recommendation below replaces the section 15 ru
 | Repo README | `README.md:17` | Rename |
 | StartOS README | `deploy/startos/README.md:13` | Rename |
 | StartOS store text, five languages | `deploy/startos/startos/manifest/i18n.ts:12,14,16,18,20` | Rename |
-| Credit links to `trycomp.ai` | `apps/app/components/auth-shell.tsx:32-37`, `apps/app/components/landing/landing-footer.tsx:42-46` | Owner decides |
+| Credit links to `trycomp.ai` | `apps/app/components/auth-shell.tsx:32-37`, `apps/app/components/landing/landing-footer.tsx:42-46` | Renamed to Freehold AI |
 | Slack bot wording, 12 files | for example `apps/app/app/(app)/[slug]/settings/connections/slack/slack-channels.tsx` (12 lines) | Leave |
 | Task reason text | `apps/api/src/agent/agent-trigger.service.ts:179` | Leave |
 | Sample company named "Comp AI" | `packages/db/prisma/seed.ts:818`, `apps/app/components/landing/product-shot/companies.ts:19` | Leave |
