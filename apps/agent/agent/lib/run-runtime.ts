@@ -3,6 +3,10 @@ import { ActivityType, db, type Prisma } from "@crm/db";
 import type { AgentActionStatus, AgentTriggerType } from "@crm/db/enums";
 import { lockIdempotencyKey } from "@crm/db/idempotency";
 import {
+	AGENT_APPROVAL_STATES,
+	readActionApproval,
+} from "@crm/validation/agent-approval";
+import {
 	AGENT_ACTION_TYPES,
 	type AgentManifestResource,
 	parseAgentManifest,
@@ -406,19 +410,21 @@ export async function postRunSlackMessage(
 			replayed: true,
 		};
 	}
+	if (requiresSlackApproval(run.version.manifest)) {
+		return requestSlackApproval(
+			run,
+			idempotencyKey,
+			requestHash,
+			destination,
+			text,
+		);
+	}
 	if (run.status !== "RUNNING") {
 		throw new Error("This agent run is not active.");
 	}
 
 	const claim = await claimRunAction(existing, idempotencyKey, requestHash, {
-		agentId: run.agentId,
-		runId,
-		type: "slack.message.post",
-		provider: "slack",
-		targetType: destination.kind,
-		targetId: destination.id,
-		targetLabel: destination.label,
-		summary: `Post a message to ${destination.label}`,
+		...slackActionRecord(run, destination),
 		metadata: { clientMessageId: randomUUID() },
 	});
 	if (!claim.claimed) {
@@ -430,6 +436,228 @@ export async function postRunSlackMessage(
 		};
 	}
 
+	return deliverSlackClaim(runId, claim, destination, text, abortSignal);
+}
+
+function slackActionRecord(
+	run: { id: string; agentId: string },
+	destination: SlackRunDestination,
+) {
+	return {
+		agentId: run.agentId,
+		runId: run.id,
+		type: AGENT_ACTION_TYPES.SLACK_MESSAGE_POST,
+		provider: "slack",
+		targetType: destination.kind,
+		targetId: destination.id,
+		targetLabel: destination.label,
+		summary: `Post a message to ${destination.label}`,
+	};
+}
+
+async function requestSlackApproval(
+	run: { id: string; agentId: string },
+	idempotencyKey: string,
+	requestHash: string,
+	destination: SlackRunDestination,
+	text: string,
+) {
+	const summary = `Waiting for approval to post to ${destination.label}.`;
+	const action = await db.$transaction(async (tx) => {
+		await lockIdempotencyKey(tx, idempotencyKey);
+		const locked = await lockAgentRun(tx, run.id);
+		const existing = await tx.agentAction.findUnique({
+			where: { idempotencyKey },
+			select: RUN_ACTION_FIELDS,
+		});
+		if (existing) {
+			assertActionRequestMatches(existing.requestHash, requestHash);
+			return existing;
+		}
+		if (locked.status !== "RUNNING") {
+			throw new Error("This agent run is not active.");
+		}
+
+		const created = await tx.agentAction.create({
+			data: {
+				...slackActionRecord(run, destination),
+				idempotencyKey,
+				requestHash,
+				metadata: {
+					clientMessageId: randomUUID(),
+					approval: {
+						state: AGENT_APPROVAL_STATES.PENDING,
+						text,
+						decidedById: null,
+						decidedAt: null,
+					},
+				},
+			},
+			select: RUN_ACTION_FIELDS,
+		});
+		const sequence = locked.nextEventSequence + 1;
+		await tx.agentRun.update({
+			where: { id: run.id },
+			data: {
+				status: "WAITING_FOR_APPROVAL",
+				summary,
+				nextEventSequence: sequence,
+			},
+		});
+		await tx.agentRunEvent.create({
+			data: {
+				id: `run-approval-requested:${created.id}`,
+				runId: run.id,
+				sequence,
+				type: "run.approval_requested",
+				data: { summary, actionId: created.id },
+			},
+		});
+		return created;
+	});
+
+	return {
+		actionId: action.id,
+		destination: destination.label,
+		awaitingApproval: true as const,
+		instruction:
+			"A person must approve this post before it is sent. Nothing was sent. Call no more tools and reply with one short sentence.",
+	};
+}
+
+export async function holdsPendingApproval(
+	tx: Prisma.TransactionClient,
+	runId: string,
+): Promise<boolean> {
+	const actions = await tx.agentAction.findMany({
+		where: {
+			runId,
+			type: AGENT_ACTION_TYPES.SLACK_MESSAGE_POST,
+			status: "PLANNED",
+		},
+		select: { metadata: true },
+	});
+	return actions.some(
+		(action) =>
+			readActionApproval(action.metadata)?.approval.state ===
+			AGENT_APPROVAL_STATES.PENDING,
+	);
+}
+
+export async function decidedSlackApprovals() {
+	const rows = await db.agentAction.findMany({
+		where: {
+			type: AGENT_ACTION_TYPES.SLACK_MESSAGE_POST,
+			status: "PLANNED",
+			run: { status: "WAITING_FOR_APPROVAL" },
+			OR: [AGENT_APPROVAL_STATES.APPROVED, AGENT_APPROVAL_STATES.REJECTED].map(
+				(state) => ({
+					metadata: { path: ["approval", "state"], equals: state },
+				}),
+			),
+		},
+		orderBy: [{ plannedAt: "asc" }, { id: "asc" }],
+		take: DISPATCH.run.batch,
+		select: { id: true, runId: true, metadata: true },
+	});
+
+	return rows.flatMap((row) => {
+		const metadata = readActionApproval(row.metadata);
+		return metadata
+			? [
+					{
+						actionId: row.id,
+						runId: row.runId,
+						state: metadata.approval.state,
+					},
+				]
+			: [];
+	});
+}
+
+export async function postApprovedSlackAction(
+	actionId: string,
+	abortSignal?: AbortSignal,
+): Promise<boolean> {
+	const action = await db.agentAction.findUniqueOrThrow({
+		where: { id: actionId },
+		select: {
+			...RUN_ACTION_FIELDS,
+			idempotencyKey: true,
+			runId: true,
+			agentId: true,
+			run: { select: { version: { select: { manifest: true } } } },
+		},
+	});
+	const metadata = readActionApproval(action.metadata);
+	if (metadata?.approval.state !== AGENT_APPROVAL_STATES.APPROVED) {
+		throw new Error("This Slack post was not approved.");
+	}
+
+	const destination = approvedSlackDestination(action.run.version.manifest);
+	const { text } = metadata.approval;
+	const requestHash = hashRequest({ destinationId: destination.id, text });
+	assertActionRequestMatches(action.requestHash, requestHash);
+	if (!(await resumeApprovedRun(action.runId, action.id))) return false;
+
+	const claim = await claimRunAction(
+		action,
+		action.idempotencyKey,
+		requestHash,
+		slackActionRecord(
+			{ id: action.runId, agentId: action.agentId },
+			destination,
+		),
+	);
+	if (claim.claimed) {
+		await deliverSlackClaim(
+			action.runId,
+			claim,
+			destination,
+			text,
+			abortSignal,
+		);
+	}
+	return true;
+}
+
+async function resumeApprovedRun(
+	runId: string,
+	actionId: string,
+): Promise<boolean> {
+	return db.$transaction(async (tx) => {
+		const run = await lockAgentRun(tx, runId);
+		if (run.status !== "WAITING_FOR_APPROVAL") return false;
+
+		const sequence = run.nextEventSequence + 1;
+		await tx.agentRun.update({
+			where: { id: runId },
+			data: {
+				status: "RUNNING",
+				startedAt: new Date(),
+				nextEventSequence: sequence,
+			},
+		});
+		await tx.agentRunEvent.create({
+			data: {
+				id: `run-approval-approved:${actionId}`,
+				runId,
+				sequence,
+				type: "run.approval_approved",
+				data: { summary: "Approved. Posting to Slack.", actionId },
+			},
+		});
+		return true;
+	});
+}
+
+async function deliverSlackClaim(
+	runId: string,
+	claim: Extract<RunActionClaim, { claimed: true }>,
+	destination: SlackRunDestination,
+	text: string,
+	abortSignal?: AbortSignal,
+) {
 	const { actionId, claimedAt } = claim;
 	try {
 		await assertRunActive(runId);
@@ -997,6 +1225,14 @@ function manifestDataScope(value: Prisma.JsonValue): RunDataScope {
 
 function manifestActions(value: Prisma.JsonValue) {
 	return parseAgentManifest(value).actions;
+}
+
+function requiresSlackApproval(value: Prisma.JsonValue): boolean {
+	return manifestActions(value).some(
+		(action) =>
+			action.type === AGENT_ACTION_TYPES.SLACK_MESSAGE_POST &&
+			action.requiresApproval,
+	);
 }
 
 function externalManifestActions(value: Prisma.JsonValue) {

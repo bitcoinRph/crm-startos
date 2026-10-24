@@ -354,9 +354,21 @@ delegation paths for custom agents.
 - **Deployment is the human approval boundary.** Saving produces a private READY
   version and never deploys it. The review screen shows its triggers, scope, actions,
   access and exact files. A user's Deploy action pins that immutable version for the
-  team. Scheduled runner sessions use task mode and therefore cannot pause for a
-  per-action approval; the deployed permission and idempotent runtime checks are the
+  team. Runner sessions use task mode and cannot park for an eve tool approval, so a
+  per-action approval is an application row, not an eve pause (next bullet). Without
+  `requiresApproval`, the deployed permission and idempotent runtime checks are the
   boundary.
+- **A Slack post can wait for a person.** A `slack.message.post` manifest action with
+  `requiresApproval: true` (default `false`) does not call Slack. `post_slack_message`
+  stores the exact text on a `PLANNED` `AgentAction` (`metadata.approval`, shape in
+  `@crm/validation/agent-approval`), sets the run to `WAITING_FOR_APPROVAL` and tells
+  the model to stop. `agents.decideRunApproval` is session-only (an API key is denied
+  in `authorizeApiKeyProcedure` and by `SessionOnlyMiddleware`) and only writes the
+  decision into that row. The next `drainAgentRuns` calls `settleSlackApprovals`:
+  approved resumes the run to `RUNNING`, posts with the stored replay id and finishes
+  it; rejected cancels the run with `APPROVAL_REJECTED` and sends nothing. The API
+  never posts. A `turn.failed` or `session.failed` after the request leaves the run waiting while the approval is undecided (`failRun` skips it). A waiting run counts as the agent's one active run until it is decided
+  or stopped, and an approved agent posts one message per run.
 - **Approved instructions are system context.** The runner resolves the pinned
   version instructions at `session.started`, then calls `inspect_run` for the manifest
   and current run state. Every runner tool also checks the `team-agent` purpose and

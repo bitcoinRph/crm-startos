@@ -43,6 +43,7 @@ export const agentManifestAction = z.discriminatedUnion("type", [
 		provider: z.literal("slack"),
 		summary: z.string(),
 		destination: slackDestination,
+		requiresApproval: z.boolean().default(false),
 	}),
 ]);
 

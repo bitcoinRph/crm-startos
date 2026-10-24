@@ -16,6 +16,10 @@ export function apiKeyRateLimited(): TRPCError {
 	});
 }
 
+export const HUMAN_ONLY_PROCEDURE = {
+	agentRunApproval: "agents.decideRunApproval",
+} as const;
+
 export type ApiKeyDecision = "allow" | "deny" | "sales";
 
 type HeaderValue = string | string[] | undefined;
@@ -46,6 +50,7 @@ export function authorizeApiKeyProcedure(
 	if (path.startsWith("apiKeys.")) return "deny";
 	if (path.startsWith("codex.")) return "deny";
 	if (PURGE_PROCEDURE.test(path)) return "deny";
+	if (path === HUMAN_ONLY_PROCEDURE.agentRunApproval) return "deny";
 	if (key.permissions === null) return "allow";
 	if (path === "intake.submit" && permits(key.permissions, "intake", "write"))
 		return "allow";

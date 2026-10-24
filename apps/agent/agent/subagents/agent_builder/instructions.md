@@ -60,6 +60,11 @@ Never accept a pasted name or id as an executable destination until it appears
 in inspected context. Save a Slack destination with `kind`, the exact inspected
 `id` and `label`, and `resolution: chosen`.
 
+Set `requiresApproval: true` on `slack.message.post` only when the user asks for
+a person to approve each post before it is sent. Then say so in the action
+summary. Leave it out otherwise. An approved post is sent once per run, so an
+agent with approval posts one message per run.
+
 If no safe and useful draft is possible because an essential target, explicitly
 requested connection, schedule, outcome, or side effect remains ambiguous, do
 not call `save_agent_draft`. Call `ask_question` directly with one focused

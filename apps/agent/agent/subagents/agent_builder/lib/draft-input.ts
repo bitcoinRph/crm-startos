@@ -54,6 +54,7 @@ const action = z.discriminatedUnion("type", [
 			id: z.string().trim().min(1).max(120),
 			label: z.string().trim().min(1).max(120),
 		}),
+		requiresApproval: z.boolean().optional(),
 	}),
 ]);
 
