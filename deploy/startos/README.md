@@ -16,7 +16,6 @@
 
 ## Table of Contents
 
-- [Downloading and Building the `.s9pk`](#downloading-and-building-the-s9pk)
 - [Image and Container Runtime](#image-and-container-runtime)
 - [Volume and Data Layout](#volume-and-data-layout)
 - [Installation and First-Run Flow](#installation-and-first-run-flow)
@@ -33,33 +32,6 @@
 
 ---
 
-## Downloading and Building the `.s9pk`
-
-Package `1.20.0:0` runs the `crm` daemons and oneshots as the `node` user, after a root `crm-volume-owner`
-oneshot gives that user the writable volume paths. It mounts `main/media` at `/data/media` for pictures.
-It adds three database migrations, applied by the `migrate` oneshot on start. Credentials are unchanged.
-
-Built packages are published on the repository's [Releases](https://github.com/bitcoinRph/crm-startos/releases) page, one release per package version, tagged `startos-v<version>` with the colon written as a hyphen. Each release carries both architectures and a `checksums.txt`:
-
-| File | Server |
-| --- | --- |
-| `crm_<version>_x86_64.s9pk` | Intel, AMD, and any x86 machine |
-| `crm_<version>_aarch64.s9pk` | Raspberry Pi, Start9 Server Pure and Server One, and any ARM machine |
-
-Download one, open your StartOS device in a browser, then click **Sideload** in the top navigation bar and select it.
-
-`.github/workflows/startos.yml` builds both architectures on every push to `release` and on **Run workflow**. Only runs on `release` publish packages. A pull request that touches `deploy/startos/`, the root `Dockerfile` or `.dockerignore` builds the same packages and uploads them as run artifacts without publishing a release.
-
-The release is named after `version` in `startos/versions/current.ts`, not after the repository's own tags. StartOS installs a package only when its version is higher than the installed one. Raise that version for each package release. Publication creates a new draft and publishes it after uploading both architectures and checksums. An existing release tag stops publication. The workflow never replaces existing assets.
-
-To build locally instead, install [Docker](https://docs.docker.com/engine/install/), Node.js 22 or newer and [`start-cli`](https://start9.com/start-cli/install.sh), create a packaging workspace once in the directory that holds the clone, then build from this directory:
-
-```sh
-start-cli s9pk init-workspace .
-npm ci
-make x86
-```
-
 ---
 
 ## Image and Container Runtime
@@ -74,7 +46,7 @@ Five daemons and three oneshots run from those two images, in this order:
 | Name | Kind | Command | Purpose |
 | --- | --- | --- | --- |
 | `postgres` | daemon | image entrypoint, `listen_addresses=127.0.0.1` | The database, loopback only |
-| `crm-volume-owner` | oneshot (root) | `chown -R node:node` on the two mounted agent paths | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root |
+| `crm-volume-owner` | oneshot (root) | `chown -R node:node` on the agent workflow data, the sandbox cache and `/data/media` | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root |
 | `migrate` | oneshot | `bunx prisma migrate deploy` in `packages/db` | Applies pending migrations on every start |
 | `local-account` | oneshot | `bun scripts/local-account.ts` in `apps/api` | Creates or resets the password account from the store |
 | `api` | daemon | `bun dist/main.js` in `apps/api`, port 3001 | NestJS API, tRPC, auth, MCP |
@@ -82,7 +54,7 @@ Five daemons and three oneshots run from those two images, in this order:
 | `agent` | daemon | `bun run start` (`eve start`, port 2000) in `apps/agent` | The eve research agent with its own schedule |
 | `scheduler` | daemon | `node /assets/scheduler.mjs` | Calls the API's `/internal/*` cron routes with `CRON_SECRET` |
 
-Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, runs `chown -R node:node` on the two mounted agent paths before `migrate` so installs that wrote them as root keep working. `postgres` is unchanged.
+Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, runs `chown -R node:node` on the agent workflow data, the sandbox cache and `/data/media` before `migrate` so installs that wrote them as root keep working. `postgres` is unchanged.
 
 Only port 3000 is bound to an interface. The API and the agent are reachable on loopback inside the container only; the agent's `/eve/v1/*` routes accept any loopback request without a token, so the agent port must never be exposed.
 
@@ -229,7 +201,7 @@ Pull the model inside the Ollama service before naming it here (`ollama pull qwe
 
 ## Contributing
 
-See [AGENTS.md](AGENTS.md).
+Building, downloading and releasing the `.s9pk` are in [CONTRIBUTING.md](CONTRIBUTING.md). Rules for agents that change this package are in [AGENTS.md](AGENTS.md).
 
 ---
 
@@ -237,6 +209,10 @@ See [AGENTS.md](AGENTS.md).
 
 ```yaml
 package_id: crm
+upstream_version: built from the same commit of this repository
+image:
+  crm: built from the repository root Dockerfile (FROM node:24.21.0-bookworm-slim)
+  postgres: postgres:17.11-alpine
 architectures: [x86_64, aarch64]
 volumes:
   main: /var/lib/postgresql (postgresql/), /app/apps/agent/.eve/.workflow-data (agent/workflow-data/), /app/apps/agent/.eve/sandbox-cache (agent/sandbox-cache/), /data/media (media/)
@@ -270,6 +246,8 @@ startos_managed_env_vars:
   - GITHUB_TOKEN
   - BLOB_READ_WRITE_TOKEN
   - CRM_MEDIA_DIR
+  - CRM_SECRETS_KEY
+  - NEXT_TELEMETRY_DISABLED
 actions:
   - set-admin-credentials
   - configure-sign-in
