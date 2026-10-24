@@ -35,8 +35,9 @@
 
 ## Downloading and Building the `.s9pk`
 
-Package `1.19.0:1` changes only the StartOS package logo. It uses the approved symmetric SVG without modification.
-Application behavior, migrations, credentials, and backups remain unchanged.
+Package `1.20.0:0` runs the `crm` daemons and oneshots as the `node` user, after a root `crm-volume-owner`
+oneshot gives that user the writable volume paths. It mounts `main/media` at `/data/media` for pictures.
+It adds three database migrations, applied by the `migrate` oneshot on start. Credentials are unchanged.
 
 Built packages are published on the repository's [Releases](https://github.com/bitcoinRph/crm-startos/releases) page, one release per package version, tagged `startos-v<version>` with the colon written as a hyphen. Each release carries both architectures and a `checksums.txt`:
 
