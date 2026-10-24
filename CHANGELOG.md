@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.20.0](https://github.com/bitcoinRph/crm-startos/compare/v1.19.0...v1.20.0) (2026-10-24)
+
+
+### Features
+
+* **agent:** approval pause before Slack posts ([#40](https://github.com/bitcoinRph/crm-startos/issues/40)) ([a9ddfe3](https://github.com/bitcoinRph/crm-startos/commit/a9ddfe3adfcee1a32627302f1207313b0c42c456))
+* **api:** audit log of every API key call ([#42](https://github.com/bitcoinRph/crm-startos/issues/42)) ([694fb66](https://github.com/bitcoinRph/crm-startos/commit/694fb662257e5ac38771c323810b4e8263ad5267))
+* **api:** CSV export and import for companies, contacts and deals ([#43](https://github.com/bitcoinRph/crm-startos/issues/43)) ([239b17a](https://github.com/bitcoinRph/crm-startos/commit/239b17a7aeca247b7fa3f77b916f32514f129079))
+* **api:** inbound intake endpoint for leads ([#39](https://github.com/bitcoinRph/crm-startos/issues/39)) ([5eb5a1f](https://github.com/bitcoinRph/crm-startos/commit/5eb5a1f13722eefe0f4e2a581cdec3706bbae277))
+* **api:** weighted forecast on the dashboard ([#34](https://github.com/bitcoinRph/crm-startos/issues/34)) ([0931a1d](https://github.com/bitcoinRph/crm-startos/commit/0931a1d0d91cf84bda12a21ec32342a7143fdf6f))
+* **app:** deal board view ([#37](https://github.com/bitcoinRph/crm-startos/issues/37)) ([16fb212](https://github.com/bitcoinRph/crm-startos/commit/16fb212d0843dbcc57a06decd2b4640278ff2417))
+* **app:** saved views on the deals list ([#29](https://github.com/bitcoinRph/crm-startos/issues/29)) ([af22d8f](https://github.com/bitcoinRph/crm-startos/commit/af22d8f45213e047391ca9824aa90bee66462410))
+* **auth:** rate-limit each API key ([#36](https://github.com/bitcoinRph/crm-startos/issues/36)) ([434048b](https://github.com/bitcoinRph/crm-startos/commit/434048bddd44c7aa9c8c292d2f09b7ba3c9fc1fb))
+* **db:** keep pictures on the server's own volume ([#38](https://github.com/bitcoinRph/crm-startos/issues/38)) ([1591185](https://github.com/bitcoinRph/crm-startos/commit/159118579f999cae82943b54746861ff012e02ea))
+
+
+### Fixes
+
+* **api:** leave archived deals out of the dashboard totals ([#26](https://github.com/bitcoinRph/crm-startos/issues/26)) ([719a8a3](https://github.com/bitcoinRph/crm-startos/commit/719a8a35e84164dc354c482efcea37aa90fb0301))
+* **api:** only a workspace owner or admin can purge records ([#31](https://github.com/bitcoinRph/crm-startos/issues/31)) ([8c6db9a](https://github.com/bitcoinRph/crm-startos/commit/8c6db9a5ef349258eece7ee9d876aabf442338fa))
+* **api:** parse the tracking collector body with Zod ([#32](https://github.com/bitcoinRph/crm-startos/issues/32)) ([c2987b9](https://github.com/bitcoinRph/crm-startos/commit/c2987b9d2e044e0e4efd694774a9df6b42e1d136))
+* **api:** stop the model catalog reaching the AI Gateway in LOCAL mode ([#28](https://github.com/bitcoinRph/crm-startos/issues/28)) ([e77f40c](https://github.com/bitcoinRph/crm-startos/commit/e77f40c34b9952239d5b5d5d4c26ce3928bac698))
+* **db:** pin safeFetch to the address it checked ([#33](https://github.com/bitcoinRph/crm-startos/issues/33)) ([99941c0](https://github.com/bitcoinRph/crm-startos/commit/99941c04189322daa87cc2887d3be7607e1e3b98))
+* **startos:** run the CRM processes as a non-root user ([#41](https://github.com/bitcoinRph/crm-startos/issues/41)) ([18ee72d](https://github.com/bitcoinRph/crm-startos/commit/18ee72d99b076595edf5fc7e9bcca65bef0c9032))
+* **startos:** use approved symmetric icon in package 1.19.0:1 ([#24](https://github.com/bitcoinRph/crm-startos/issues/24)) ([4b158fb](https://github.com/bitcoinRph/crm-startos/commit/4b158fb537886962657ffec79e867062c6aad84f))
+
+
+### Documentation
+
+* correct sentences that disagree with the code ([#27](https://github.com/bitcoinRph/crm-startos/issues/27)) ([bd7adfb](https://github.com/bitcoinRph/crm-startos/commit/bd7adfbbf4089c9ef1c661ec456f6e1b15968a0e))
+* decision proposals for the enterprise plan ([#35](https://github.com/bitcoinRph/crm-startos/issues/35)) ([427956a](https://github.com/bitcoinRph/crm-startos/commit/427956a9d45d390d37e1c9feb9c7a23af1f073cc))
+* **startos:** a repeatable backup and restore drill ([#30](https://github.com/bitcoinRph/crm-startos/issues/30)) ([97964ee](https://github.com/bitcoinRph/crm-startos/commit/97964ee09313de4ffc93cfa3df70e798e24f1543))
+
 ## [1.19.0](https://github.com/bitcoinRph/crm-startos/compare/v1.18.0...v1.19.0) (2026-10-23)
 
 
