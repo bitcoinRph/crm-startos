@@ -20,16 +20,20 @@ export function normalizeDomain(
 	return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(bare) ? bare : null;
 }
 
+export function companyDomain(input: string | null | undefined): string | null {
+	const domain = normalizeDomain(input);
+	if (!domain) return null;
+	return FREE_EMAIL_DOMAINS.has(domain) || isMachineDomain(domain)
+		? null
+		: domain;
+}
+
 export function domainFromEmail(
 	email: string | null | undefined,
 ): string | null {
 	const at = email?.trim().toLowerCase().lastIndexOf("@") ?? -1;
 	if (at < 1) return null;
-	const domain = normalizeDomain(email?.slice(at + 1));
-	if (!domain) return null;
-	return FREE_EMAIL_DOMAINS.has(domain) || isMachineDomain(domain)
-		? null
-		: domain;
+	return companyDomain(email?.slice(at + 1));
 }
 
 export function isMachineDomain(input: string | null | undefined): boolean {

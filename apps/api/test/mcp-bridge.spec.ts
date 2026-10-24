@@ -172,6 +172,7 @@ afterEach(async () => {
 	await db.activity.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.deal.deleteMany({ where: { id: { startsWith: prefix } } });
 	await db.contact.deleteMany({ where: { id: { startsWith: prefix } } });
+	await db.contact.deleteMany({ where: { email: `lead@${prefix}.test` } });
 	await db.company.deleteMany({ where: { id: { startsWith: prefix } } });
 	if (userId)
 		await db.user.deleteMany({
@@ -628,6 +629,7 @@ const profileTools = {
 		...existingProfileTools.crm_integration,
 		"resolve_customer",
 		"follow_ups",
+		"intake_submit",
 	],
 	agent_propose: [
 		...existingProfileTools.agent_propose,
@@ -639,7 +641,13 @@ const profileTools = {
 		"resolve_customer",
 		"follow_ups",
 	],
-	legacy: [...existingProfileTools.legacy, "resolve_customer", "follow_ups"],
+	legacy: [
+		...existingProfileTools.legacy,
+		"resolve_customer",
+		"follow_ups",
+		"intake_submit",
+	],
+	intake: ["intake_submit"],
 } as const;
 
 async function ownedState() {
@@ -689,6 +697,7 @@ describe("MCP profile discovery", () => {
 			"crm_integration",
 			"agent_propose",
 			"agent_read",
+			"intake",
 			"legacy",
 		] as const) {
 			const key = await createKey(profile === "legacy" ? undefined : profile);
@@ -755,6 +764,23 @@ describe("MCP profile discovery", () => {
 			["attach_contact_to_deal", { dealId, contactId }],
 			["log_activity", { type: "NOTE", body: "synthetic", contactId }],
 			["complete_task", { id: `${prefix}-task`, completed: true }],
+			["intake_submit", { email: `denied@${prefix}.test` }],
+			["search_crm", { q: prefix }],
+			["resolve_customer", { domain: `${prefix}.test` }],
+			["whoami", {}],
+			["list_users", {}],
+			["get_workspace", {}],
+			["dashboard_summary", {}],
+			["list_contacts", {}],
+			["get_contact", { id: contactId }],
+			["list_companies", {}],
+			["get_company", { id: companyId }],
+			["list_deals", {}],
+			["get_deal", { id: dealId }],
+			["timeline", { contactId }],
+			["my_tasks", {}],
+			["follow_ups", { timeZone: "UTC", days: 1 }],
+			["list_fields", { entity: "CONTACT" }],
 		]);
 		await db.activity.create({
 			data: {
@@ -768,6 +794,7 @@ describe("MCP profile discovery", () => {
 		for (const profile of [
 			"agent_read",
 			"crm_integration",
+			"intake",
 			"legacy",
 		] as const) {
 			const key = await createKey(profile === "legacy" ? undefined : profile);
@@ -795,6 +822,57 @@ describe("MCP profile discovery", () => {
 				expect(await ownedState()).toEqual(before);
 			}
 		}
+	});
+
+	it("an intake key files a lead through intake_submit", async () => {
+		const key = await createKey("intake");
+		const client = await connect({ authorization: `Bearer ${key.key}` });
+		const email = `Lead@${prefix}.test`;
+		const result = await call(client, {
+			name: "intake_submit",
+			arguments: { email, firstName: `${prefix} lead`, source: "mcp-test" },
+		});
+		expect(result.isError).not.toBe(true);
+		const filed = z
+			.object({
+				status: z.literal("accepted"),
+				contactId: z.string(),
+				created: z.literal(true),
+			})
+			.parse(JSON.parse(z.string().parse(result.content[0]?.text)));
+		const contact = await db.contact.findUnique({
+			where: { id: filed.contactId },
+			select: { email: true, source: true },
+		});
+		expect(contact).toEqual({ email: email.toLowerCase(), source: "INTAKE" });
+		const denied = await call(client, {
+			name: "get_contact",
+			arguments: { id: filed.contactId },
+		});
+		expect(denied.content[0]?.text).toStartWith("FORBIDDEN:");
+		const http = (path: string, body: Record<string, string>) =>
+			fetch(new URL(`/api/trpc/${path}`, endpoint), {
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${key.key}`,
+					"content-type": "application/json",
+				},
+				body: JSON.stringify(body),
+			});
+		const second = await http("intake.submit", { email });
+		expect(second.status).toBe(200);
+		expect(
+			z
+				.object({
+					result: z.object({
+						data: z.object({ created: z.literal(false) }),
+					}),
+				})
+				.safeParse(await second.json()).success,
+		).toBe(true);
+		const other = await http("contacts.create", { firstName: "Denied" });
+		expect(other.status).toBe(403);
+		await db.agentTask.deleteMany({ where: { contactId: filed.contactId } });
 	});
 
 	it("P3 lists every tool for a cookie session", async () => {

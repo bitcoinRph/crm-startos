@@ -44,5 +44,11 @@ describe("API key profiles", () => {
 		expect(permits(KEY_PERMISSIONS.crm_integration, "sales", "read")).toBe(
 			false,
 		);
+		expect(permits(KEY_PERMISSIONS.intake, "intake", "write")).toBe(true);
+		expect(permits(KEY_PERMISSIONS.intake, "crm", "read")).toBe(false);
+		expect(permits(KEY_PERMISSIONS.intake, "crm", "write")).toBe(false);
+		expect(permits(KEY_PERMISSIONS.crm_integration, "intake", "write")).toBe(
+			false,
+		);
 	});
 });
