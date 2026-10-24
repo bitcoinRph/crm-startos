@@ -76,6 +76,7 @@ export function useCrmCache(): CrmCache {
 		trpc.companies.list.queryKey(),
 		trpc.contacts.list.queryKey(),
 		trpc.deals.list.queryKey(),
+		trpc.deals.stageValues.queryKey(),
 		trpc.search.quick.queryKey(),
 	];
 
