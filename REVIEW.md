@@ -535,7 +535,7 @@ D7 exact verified version list. D4 (architecture) is still open; CI builds both.
 | N1 non-root container | — | Not done: `FOLLOWUPS.md` G |
 | N2 Python turbo check | PR #8 `docs(crm)` | Done: replaced by `turbo-env.spec.ts` |
 | N3 empty commit | — | Squash-merge removes it |
-| N4 catalog egress in `LOCAL` | — | Not done: small, listed for the next PR |
+| N4 catalog egress in `LOCAL` | — | Done: `ModelCatalogService.models` returns an empty catalog in `LOCAL` without a network call |
 | N5 `EXPOSE` ports | — | Left alone |
 
 ## Issues
