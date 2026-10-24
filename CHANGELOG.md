@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.1](https://github.com/bitcoinRph/crm-startos/compare/v1.22.0...v1.22.1) (2026-10-24)
+
+
+### Fixes
+
+* reach every REST route, fix the sales review queue, StartOS 1.22.1:0 ([#55](https://github.com/bitcoinRph/crm-startos/issues/55)) ([96e5fab](https://github.com/bitcoinRph/crm-startos/commit/96e5fab7da062a0b5cb3310dc951c9576956a057))
+
 ## [1.22.0](https://github.com/bitcoinRph/crm-startos/compare/v1.21.0...v1.22.0) (2026-10-24)
 
 
