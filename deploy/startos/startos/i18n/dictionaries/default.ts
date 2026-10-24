@@ -60,6 +60,8 @@ const dict = {
   'Model ID must start with a letter or number and contain only letters, numbers, dots, underscores, colons, slashes and hyphens.': 59,
   'Max output tokens': 62,
   'Maximum tokens the model will generate per response. Must be between 1 and 1024.': 63,
+  'REST API': 64,
+  'OpenAPI document of the CRM API. Tools call /rest on this address with a CRM API key from Settings.': 65,
 } as const
 
 /**

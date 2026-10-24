@@ -34,5 +34,19 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
     query: {},
   })
 
-  return [await uiMultiOrigin.export([ui, mcp])]
+  const rest = sdk.createInterface(effects, {
+    name: i18n('REST API'),
+    id: 'rest',
+    description: i18n(
+      'OpenAPI document of the CRM API. Tools call /rest on this address with a CRM API key from Settings.',
+    ),
+    type: 'api',
+    masked: false,
+    schemeOverride: null,
+    username: null,
+    path: '/openapi.json',
+    query: {},
+  })
+
+  return [await uiMultiOrigin.export([ui, mcp, rest])]
 })

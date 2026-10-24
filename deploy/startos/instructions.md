@@ -1,4 +1,4 @@
-# CRM
+# Freehold AI CRM
 
 ## Documentation
 
@@ -14,7 +14,7 @@ Password sign-in is on, so nothing outside your network is needed to get in. Goo
 
 ## Getting set up
 
-Package 1.20.0:0 runs the CRM as a non-root user, keeps pictures on the service volume, and adds saved views, a deal board, a weighted forecast, CSV export and import, lead intake and Slack post approval. Back up before you update. Downloading a package does not update an installed service.
+Package 1.21.0:0 renames the CRM to Freehold AI CRM. It adds a review queue and rejection for sales proposals, a value on each deal board column, and the REST API with its OpenAPI document on the web interface. Back up before you update. Downloading a package does not update an installed service.
 
 1. Run **Set Sign-in Credentials**. Enter the email address you will use and leave the password empty to generate one. Copy both; the password is shown once.
 2. Start the service and open the **Web UI** interface. Sign in with the email and password from step 1. The first account to sign in owns the workspace.
@@ -24,7 +24,7 @@ Package 1.20.0:0 runs the CRM as a non-root user, keeps pictures on the service 
    - Or run **Configure Research Agent** and provide a Vercel AI Gateway key for explicit legacy mode.
    - Leave both unset to keep inference disabled while the CRM remains available.
 
-## Using CRM
+## Using Freehold AI CRM
 
 ### Web interface
 
@@ -71,12 +71,20 @@ mcp_servers:
 
 The agent gets tools to search the CRM, read and update companies, contacts and deals, log notes and tasks, and queue research. It acts as the user who created the key. If your client does not trust your server's certificate, use the address's `http` form on your own network.
 
+### Connecting a tool over REST (OpenAPI)
+
+1. In the web app, open **Settings → API keys** and create a key with the narrowest access the tool needs. Copy it; it is shown once.
+2. Copy the address of the **REST API** interface. It ends in `/openapi.json`.
+3. Give the tool that address as an OpenAPI tool server, and the key as the `x-api-key` header or as `Authorization: Bearer <key>`.
+
+The tool calls the paths under `/rest` on the same address. A call without a key gets `401`. A key without the access a call needs gets `403`.
+
 ### Using your ChatGPT plan (Codex)
 
 1. Open **Settings → General** and find **Codex (your ChatGPT plan)**.
 2. Select **Connect ChatGPT**. The CRM shows a code. Open the link, sign in to ChatGPT and enter the code. If OpenAI refuses, turn on device code login in your ChatGPT security settings.
 3. Choose a model. New research conversations you start now run on that model. Conversations you already had keep their model.
-4. To let an agent such as Hermes use your plan for CRM work, have it file sales requests with profile `crm-codex`. The CRM runs them on your connection and you approve the result on the Sales page. Your sign-in never leaves the CRM.
+4. To let an agent such as Hermes use your plan for CRM work, have it file sales requests with profile `crm-codex`. The CRM runs them on your connection and you approve or reject the result on the **Sales proposals** page. Your sign-in never leaves the CRM.
 
 You can connect an OpenAI API key instead; it is billed per token on your OpenAI Platform account. **Disconnect** removes the connection and revokes the sign-in at OpenAI.
 
