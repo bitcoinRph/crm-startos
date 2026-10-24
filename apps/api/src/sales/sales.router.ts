@@ -1,5 +1,6 @@
 import {
 	salesApproveInput,
+	salesRejectInput,
 	salesRequestIdInput,
 	salesRequestInput,
 	salesSubmitInput,
@@ -23,6 +24,8 @@ import {
 	salesPendingOutput,
 	salesProposalOutput,
 	salesRequestOutput,
+	salesReviewQueueInput,
+	salesReviewQueueOutput,
 	salesWire,
 } from "./sales.contracts";
 import { SALES_SCOPES, SalesService } from "./sales.service";
@@ -101,6 +104,25 @@ export class SalesRouter {
 		);
 	}
 
+	@Query({
+		input: salesReviewQueueInput,
+		output: salesReviewQueueOutput,
+		meta: restMeta("GET", "/sales/requests/review-queue", ["Sales"]),
+	})
+	async reviewQueue(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof salesReviewQueueInput>,
+	) {
+		return salesReviewQueueOutput.parse(
+			salesWire(
+				await this.sales.reviewQueue(
+					await salesActor(ctx, SALES_SCOPES.read),
+					input.limit,
+				),
+			),
+		);
+	}
+
 	@Mutation({
 		input: salesSubmitInput,
 		output: salesProposalOutput,
@@ -137,6 +159,25 @@ export class SalesRouter {
 		return salesProposalOutput.parse(
 			salesWire(
 				await this.sales.approveProposal(
+					await salesActor(ctx, SALES_SCOPES.approve),
+					input,
+				),
+			),
+		);
+	}
+
+	@Mutation({
+		input: salesRejectInput,
+		output: salesProposalOutput,
+		meta: restMeta("POST", "/sales/proposals/reject", ["Sales"]),
+	})
+	async rejectProposal(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof salesRejectInput>,
+	) {
+		return salesProposalOutput.parse(
+			salesWire(
+				await this.sales.rejectProposal(
 					await salesActor(ctx, SALES_SCOPES.approve),
 					input,
 				),

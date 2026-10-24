@@ -1,10 +1,17 @@
 import { appUrl } from "@crm/auth";
 import { Button } from "@crm/ui/components/button";
+import { Field, FieldLabel } from "@crm/ui/components/field";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@crm/ui/components/input-group";
 import { Markdown } from "@crm/ui/components/markdown";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireSession } from "@/lib/session";
+import { CopyValue } from "../../copy-value";
 import { ConnectionPage, ConnectionPageLoading } from "../connection-page";
 import { intakeCurl, intakeEndpoint, intakeOrigin } from "./intake-example";
 
@@ -50,10 +57,23 @@ async function IntakeConnectionPageContent({
 			<section className="flex flex-col gap-3 border-t px-(--spacing-block-inline) pt-5">
 				<h2 className="font-medium text-sm">2. Send the lead</h2>
 				<p className="text-muted-foreground text-xs leading-relaxed">
-					POST JSON to {intakeEndpoint(origin)} with the key as a bearer token.
-					Only email is required. You can also send firstName, lastName,
-					companyName, companyDomain, message and source.
+					POST JSON to this endpoint with the key as a bearer token. Only email
+					is required. You can also send firstName, lastName, companyName,
+					companyDomain, message and source.
 				</p>
+				<Field>
+					<FieldLabel htmlFor="intake-endpoint">Endpoint</FieldLabel>
+					<InputGroup>
+						<InputGroupInput
+							id="intake-endpoint"
+							value={intakeEndpoint(origin)}
+							readOnly
+						/>
+						<InputGroupAddon align="inline-end">
+							<CopyValue value={intakeEndpoint(origin)} label="Endpoint" />
+						</InputGroupAddon>
+					</InputGroup>
+				</Field>
 				<Markdown>{`\`\`\`sh\n${intakeCurl(origin)}\n\`\`\``}</Markdown>
 			</section>
 			<section className="flex flex-col gap-3 border-t px-(--spacing-block-inline) pt-5">

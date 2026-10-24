@@ -105,8 +105,12 @@ function Combobox({
 							{options.map((option) => (
 								<CommandItem
 									key={option.value}
-									value={option.label}
-									keywords={option.keywords}
+									value={option.value}
+									keywords={[
+										option.label,
+										...(option.hint ? [option.hint] : []),
+										...(option.keywords ?? []),
+									]}
 									disabled={stale}
 									data-checked={option.value === value}
 									onSelect={() => {

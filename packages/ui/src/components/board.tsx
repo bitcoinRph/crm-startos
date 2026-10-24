@@ -23,6 +23,7 @@ function BoardColumn({
 	dragType,
 	onDropItem,
 	empty,
+	summary,
 	className,
 	children,
 	...props
@@ -33,6 +34,7 @@ function BoardColumn({
 	dragType: string;
 	onDropItem: (itemId: string) => void;
 	empty?: React.ReactNode;
+	summary?: React.ReactNode;
 }) {
 	const [over, setOver] = React.useState(false);
 	const titleId = React.useId();
@@ -69,11 +71,21 @@ function BoardColumn({
 			}}
 			{...props}
 		>
-			<header className="flex items-center justify-between gap-2 px-1 py-0.5 text-xs font-medium">
-				<h2 id={titleId} className="truncate">
-					{title}
-				</h2>
-				<span className="text-muted-foreground tabular-nums">{count}</span>
+			<header className="flex flex-col gap-0.5 px-1 py-0.5 text-xs">
+				<div className="flex items-center justify-between gap-2 font-medium">
+					<h2 id={titleId} className="truncate">
+						{title}
+					</h2>
+					<span className="text-muted-foreground tabular-nums">{count}</span>
+				</div>
+				{summary ? (
+					<div
+						data-slot="board-column-summary"
+						className="truncate text-muted-foreground tabular-nums"
+					>
+						{summary}
+					</div>
+				) : null}
 			</header>
 			<ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
 				{count === 0 && empty ? (

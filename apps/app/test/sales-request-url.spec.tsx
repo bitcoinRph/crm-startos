@@ -6,6 +6,7 @@ import {
 	type SalesRequest,
 	SalesWorkflow,
 } from "../app/(app)/[slug]/sales/sales-workflow";
+import { SALES_WORKFLOW } from "../app/(app)/[slug]/sales/sales-workflow-config";
 import { TRPCReactProvider, useTRPC } from "../lib/trpc/client";
 
 const request: SalesRequest = {
@@ -96,5 +97,35 @@ describe("sales request URL recovery", () => {
 		}
 		expect(inaccessible).toContain("Request not found");
 		expect(inaccessible).toContain("Retry request status");
+	});
+});
+
+function SeedQueue() {
+	const trpc = useTRPC();
+	const client = useQueryClient();
+	client.setQueryData(
+		trpc.sales.reviewQueue.queryKey({ limit: SALES_WORKFLOW.queue.limit }),
+		{
+			rows: [{ ...request, status: "PENDING" as const }],
+			counts: { pending: 1, proposed: 0 },
+		},
+	);
+	return <SalesWorkflow />;
+}
+
+describe("sales review queue", () => {
+	it("lists waiting requests with their raw status for automation", () => {
+		const html = renderToStaticMarkup(
+			<NuqsTestingAdapter searchParams="">
+				<TRPCReactProvider>
+					<SeedQueue />
+				</TRPCReactProvider>
+			</NuqsTestingAdapter>,
+		);
+		expect(html).toContain("Waiting for review");
+		expect(html).toContain(`data-request="${request.id}"`);
+		expect(html).toContain('data-status="PENDING"');
+		expect(html).toContain("0 proposals to review · 1 request waiting");
+		expect(html).toContain("Synthetic Buyer");
 	});
 });

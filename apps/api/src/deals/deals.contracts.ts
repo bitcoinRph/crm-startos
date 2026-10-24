@@ -1,4 +1,5 @@
 import { DealStage } from "@crm/db";
+import { OPEN_DEAL_STAGES } from "@crm/db/deal-stage";
 import { FIELD_ENTITIES, FIELD_TYPES } from "@crm/db/fields";
 import { z } from "zod";
 import { bulkIdsInput } from "../crm/bulk";
@@ -223,6 +224,17 @@ export const dealListOutput = z.object({
 });
 
 export type DealListResult = z.infer<typeof dealListOutput>;
+
+export const dealStageValuesOutput = z.object({
+	reportingCurrency: z.string(),
+	stages: z.array(
+		z.object({
+			stage: z.enum(OPEN_DEAL_STAGES),
+			valueCents: z.number(),
+			unconverted: z.number(),
+		}),
+	),
+});
 
 export const dealDetailOutput = z.object({
 	id: z.string(),

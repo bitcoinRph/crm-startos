@@ -3,6 +3,7 @@ import type { Db } from "@crm/db";
 import { SalesStoreError, storeSalesProposal } from "@crm/db/sales";
 import {
 	salesApproveInput,
+	salesRejectInput,
 	salesRequestInput,
 	salesSubmitInput,
 	validateSalesOperations,
@@ -10,6 +11,7 @@ import {
 import { Injectable } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
 import { InjectDatabase } from "../database/database.constants";
+import { SALES } from "./sales-config";
 
 export type SalesActor =
 	| { userId: string; kind: "session"; sessionId: string }
@@ -108,8 +110,23 @@ export class SalesService {
 		return this.db.salesRequest.findMany({
 			where: { status: "PENDING" },
 			orderBy: { createdAt: "asc" },
-			take: 20,
+			take: SALES.pending.limit,
 		});
+	}
+
+	async reviewQueue(actor: SalesActor, limit: number) {
+		requireSalesScope(actor, SALES_SCOPES.read);
+		const [rows, pending, proposed] = await this.db.$transaction([
+			this.db.salesRequest.findMany({
+				where: { status: { in: ["PROPOSED", "PENDING"] } },
+				orderBy: [{ status: "desc" }, { createdAt: "asc" }],
+				take: limit,
+				include: { proposal: true },
+			}),
+			this.db.salesRequest.count({ where: { status: "PENDING" } }),
+			this.db.salesRequest.count({ where: { status: "PROPOSED" } }),
+		]);
+		return { rows, counts: { pending, proposed } };
 	}
 
 	async storeProposal<T>(actor: SalesActor, raw: T) {
@@ -167,6 +184,11 @@ export class SalesService {
 					message: "Approval key mismatch.",
 				});
 			if (proposal.approvedAt) return proposal;
+			if (proposal.rejectedAt)
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "This proposal was rejected.",
+				});
 			const request = proposal.request;
 			await tx.$queryRaw`SELECT id FROM "contact" WHERE id = ${request.contactId} FOR UPDATE`;
 			const contact = await tx.contact.findFirst({
@@ -245,6 +267,55 @@ export class SalesService {
 					approvedById: actor.userId,
 					approvedSessionId: actor.sessionId,
 					appliedActivityIds,
+				},
+			});
+		});
+	}
+
+	async rejectProposal<T>(actor: SalesActor, raw: T) {
+		requireSalesScope(actor, SALES_SCOPES.approve);
+		if (actor.kind !== "session") throw new TRPCError({ code: "FORBIDDEN" });
+		const input = salesRejectInput.parse(raw);
+		return this.db.$transaction(async (tx) => {
+			const session = await tx.session.findFirst({
+				where: {
+					id: actor.sessionId,
+					userId: actor.userId,
+					expiresAt: { gt: new Date() },
+				},
+			});
+			if (!session)
+				throw new TRPCError({
+					code: "UNAUTHORIZED",
+					message: "Active human session required.",
+				});
+			await tx.$queryRaw`SELECT id FROM "salesProposal" WHERE id = ${input.proposalId}::uuid FOR UPDATE`;
+			const proposal = await tx.salesProposal.findUnique({
+				where: { id: input.proposalId },
+			});
+			if (!proposal) throw new TRPCError({ code: "NOT_FOUND" });
+			if (proposal.idempotencyKey !== input.idempotencyKey)
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "Approval key mismatch.",
+				});
+			if (proposal.rejectedAt) return proposal;
+			if (proposal.approvedAt)
+				throw new TRPCError({
+					code: "CONFLICT",
+					message: "This proposal was already approved.",
+				});
+			await tx.salesRequest.update({
+				where: { id: proposal.requestId },
+				data: { status: "REJECTED" },
+			});
+			return tx.salesProposal.update({
+				where: { id: proposal.id },
+				data: {
+					rejectedAt: new Date(),
+					rejectedById: actor.userId,
+					rejectedSessionId: actor.sessionId,
+					rejectionReason: input.reason,
 				},
 			});
 		});

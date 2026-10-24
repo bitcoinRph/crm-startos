@@ -52,6 +52,20 @@ function Seed({ total }: { total: number }) {
 		trpc.deals.list.queryKey(dealsBoardInput(dealsSearchParams.defaultInput())),
 		{ rows, total, facetCounts: {} } as DealList,
 	);
+	client.setQueryData(
+		trpc.deals.stageValues.queryKey(
+			dealsBoardInput(dealsSearchParams.defaultInput()),
+		),
+		{
+			reportingCurrency: "USD",
+			stages: [
+				{ stage: "DEMO_BOOKED", valueCents: 125000, unconverted: 0 },
+				{ stage: "QUALIFIED_TO_BUY", valueCents: 50000, unconverted: 2 },
+				{ stage: "DECISION_MAKER_BOUGHT_IN", valueCents: 0, unconverted: 0 },
+				{ stage: "CONTRACT_SENT", valueCents: 990000, unconverted: 0 },
+			],
+		},
+	);
 	return <DealsTable />;
 }
 
@@ -102,6 +116,14 @@ describe("deals board view", () => {
 		expect(html).toContain('aria-label="Deals by stage"');
 		expect(html).toContain('aria-label="View"');
 		expect(html).toContain('data-count="2"');
+	});
+
+	it("shows each column's value in the reporting currency and what it leaves out", () => {
+		const html = render("?view=board");
+		expect(column(html, "DEMO_BOOKED")).toContain("$1,250");
+		expect(column(html, "QUALIFIED_TO_BUY")).toContain("2 not counted");
+		expect(column(html, "CONTRACT_SENT")).not.toContain("not counted");
+		expect(html.match(/data-slot="board-column-summary"/g)?.length).toBe(4);
 	});
 
 	it("shows a drop hint in an empty column", () => {

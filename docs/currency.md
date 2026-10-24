@@ -11,6 +11,8 @@ to dollars and printed `$2.0M`, silently.)
   converted against a stale base is indistinguishable from a correct one.
   - **`countedWhere(base)` filters every money aggregate.** Counts are deliberately
     *not* filtered, so stage groups read counts and sums from separate queries.
+    `deals.stageValues` is the board's per-column figure: a `countedWhere` sum
+    and a `pendingWhere` count per open stage, under the list's own filters.
   - **`pendingWhere(base)`** = null `baseAmount` *or* wrong `baseCurrency`, and it
     **matches null explicitly** — `{ not: base }` is `NULL`, not true, for a null
     column, so such rows were invisible everywhere.
