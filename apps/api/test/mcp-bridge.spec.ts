@@ -2450,6 +2450,8 @@ describe("record change ledger", () => {
 				(await revertAsPerson(z.string().parse(creation?.id))).status,
 			).toBe(409);
 		} finally {
+			await db.agentTask.deleteMany({ where: { contactId: contact.id } });
+			await db.agentEvent.deleteMany({ where: { contactId: contact.id } });
 			await db.contact.delete({ where: { id: contact.id } });
 		}
 	});
