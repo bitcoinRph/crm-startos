@@ -1,4 +1,4 @@
-import { blobEnabled } from "@crm/db/blob";
+import { mirrorEnabled } from "@crm/db/blob";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { spend } from "../lib/focus";
@@ -17,12 +17,12 @@ export default defineTool({
 	}),
 	async execute({ contactId, force }, ctx) {
 		assertResearchPurpose(ctx);
-		if (!blobEnabled()) {
+		if (!mirrorEnabled()) {
 			return {
 				stored: false as const,
 				configured: false as const,
 				reason:
-					"This install has no BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy, and " +
+					"This install has no CRM_MEDIA_DIR or BLOB_READ_WRITE_TOKEN, so there is nowhere to keep a copy, and " +
 					"the source URLs expire. Retrying will not help.",
 			};
 		}

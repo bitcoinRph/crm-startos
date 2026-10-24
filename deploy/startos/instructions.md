@@ -84,7 +84,7 @@ You can connect an OpenAI API key instead; it is billed per token on your OpenAI
 
 - **Set Sign-in Credentials** — create or reset the password account. Takes effect on the next start.
 - **Configure Sign-in** — the allow-list, the public URL, and Google or Microsoft sign-in.
-- **Configure Research Agent** — explicit legacy Gateway mode and optional Perplexity, GitHub and Vercel Blob keys, plus telemetry.
+- **Configure Research Agent** — explicit legacy Gateway mode and optional Perplexity, GitHub and Vercel Blob keys, plus telemetry. Contact photos and logos are kept on your server and included in backups, so the Vercel Blob key is not needed.
 - **Configure Local Inference** — the model ID pulled in the Ollama service and the output token cap. Leave the model ID empty to turn local inference off. While a model is set, the Ollama service is a required dependency and the CRM does not start without it.
 
 ## Limitations

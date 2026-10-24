@@ -88,9 +88,9 @@ retry policy (a failed request stays `FAILED` and the agent files a new one).
 
 ## F. Pictures on a StartOS volume
 
-`packages/db/src/blob.ts` mirrors to Vercel Blob only. Add a filesystem backend
-that writes under the `main` volume and serves through the app, keyed by the
-same content hash. `isOptimizable` then allow-lists the CRM's own origin.
+Implemented: `CRM_MEDIA_DIR` makes `mirror()` write under the `main` volume
+(`media/` on StartOS) and the app serves `/media/<name>`. What is left: an
+install test on a real StartOS box, and a size cap on the directory.
 
 ## G. Container hardening
 

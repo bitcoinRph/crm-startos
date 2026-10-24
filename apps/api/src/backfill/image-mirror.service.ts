@@ -1,9 +1,10 @@
 import type { Db, Prisma } from "@crm/db";
-import { blobEnabled, mirror } from "@crm/db/blob";
+import { mirror, mirrorEnabled } from "@crm/db/blob";
 import {
 	BLOB_HOST_SUFFIX,
 	COMPANY_IMAGE_FIELDS,
 	type CompanyImageField,
+	MEDIA_PATH_PREFIX,
 } from "@crm/db/images";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
@@ -14,12 +15,18 @@ type CompanyImageRow = Record<CompanyImageField, string | null>;
 
 const EXTERNAL_CONTACT_IMAGE: Prisma.ContactWhereInput = {
 	imageUrl: { not: null },
-	NOT: { imageUrl: { contains: BLOB_HOST_SUFFIX } },
+	NOT: [
+		{ imageUrl: { contains: BLOB_HOST_SUFFIX } },
+		{ imageUrl: { startsWith: MEDIA_PATH_PREFIX } },
+	],
 };
 
 const EXTERNAL_USER_IMAGE: Prisma.UserWhereInput = {
 	image: { not: null },
-	NOT: { image: { contains: BLOB_HOST_SUFFIX } },
+	NOT: [
+		{ image: { contains: BLOB_HOST_SUFFIX } },
+		{ image: { startsWith: MEDIA_PATH_PREFIX } },
+	],
 };
 
 export type ImageMirrorResult = {
@@ -34,7 +41,7 @@ export class ImageMirrorService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
 	async sweep(): Promise<ImageMirrorResult> {
-		if (!blobEnabled()) return { scanned: 0, copied: 0 };
+		if (!mirrorEnabled()) return { scanned: 0, copied: 0 };
 
 		const results = [
 			await this.sweepCompanies(),
@@ -157,10 +164,13 @@ export class ImageMirrorService {
 function externalCompanyImage(
 	field: CompanyImageField,
 ): Prisma.CompanyWhereInput {
-	const mirrored: Prisma.CompanyWhereInput = {};
-	mirrored[field] = { contains: BLOB_HOST_SUFFIX };
+	const blob: Prisma.CompanyWhereInput = {};
+	blob[field] = { contains: BLOB_HOST_SUFFIX };
 
-	const where: Prisma.CompanyWhereInput = { NOT: mirrored };
+	const local: Prisma.CompanyWhereInput = {};
+	local[field] = { startsWith: MEDIA_PATH_PREFIX };
+
+	const where: Prisma.CompanyWhereInput = { NOT: [blob, local] };
 	where[field] = { not: null };
 
 	return where;

@@ -91,7 +91,10 @@ One volume, `main`:
 | `postgresql/` | `/var/lib/postgresql` in `postgres` | The database cluster (`PGDATA=/var/lib/postgresql/data`) |
 | `agent/workflow-data/` | `/app/apps/agent/.eve/.workflow-data` in `crm` | eve's durable workflow runs |
 | `agent/sandbox-cache/` | `/app/apps/agent/.eve/sandbox-cache` in `crm` | The agent's just-bash sandbox filesystem |
+| `media/` | `/data/media` in `crm` | Contact photos, logos and avatars, one file per picture, named by a hash of its bytes |
 | `store.json` | not mounted; read by the package | Generated secrets, the sign-in and agent configuration, the password account |
+
+`CRM_MEDIA_DIR=/data/media` points the API, the app and the agent at `media/`. The agent and the API write there; the app serves the files at `/media/<name>` on its own origin, without a session. Backups copy `media/` with the rest of the volume.
 
 `store.json` holds `postgresPassword`, `authSecret` (`BETTER_AUTH_SECRET`), `bridgeSecret` (`AGENT_BRIDGE_SECRET`), `cronSecret` (`CRON_SECRET`), `admin` (email and password of the password account), `signIn` and `agent` (research-agent and local-inference configuration).
 
@@ -112,7 +115,7 @@ There is no seed data. Upstream's `dev:session` script is not used.
 | `API_URL` (the public URL) and `APP_URL` (every non-local address of the Web UI) | Agent model, Context key, archive retention (Settings → General) |
 | Google and Microsoft OAuth clients, Microsoft tenant | SSO providers (Settings → SSO), API keys (Settings → API keys) |
 | `AI_GATEWAY_API_KEY`, `CRM_INFERENCE_MODE`, `CRM_LOCAL_INFERENCE_JSON`, `CRM_LOCAL_INFERENCE_ALLOWED_HOSTS`, `PERPLEXITY_API_KEY`, `GITHUB_TOKEN`, `BLOB_READ_WRITE_TOKEN`, telemetry | Slack connection, tracking settings |
-| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, all five secrets (including `CRM_SECRETS_KEY`), `NODE_ENV=production` | Codex connection per user (Settings → General → Codex) |
+| `PASSWORD_SIGN_IN=true`, `API_INTERNAL_URL`, `AGENT_URL`, `CRM_MEDIA_DIR=/data/media`, all five secrets (including `CRM_SECRETS_KEY`), `NODE_ENV=production` | Codex connection per user (Settings → General → Codex) |
 
 `APP_URL` is recomputed whenever the service's addresses change, so a new domain or a disabled gateway restarts the service with the right trusted origins. `API_URL` is the **Public URL** from **Configure Sign-in**, or else the first public address, or else the first address of the Web UI.
 
@@ -206,7 +209,7 @@ Pull the model inside the Ollama service before naming it here (`ollama pull qwe
 2. **Google sign-in needs a public domain.** Google refuses `.local` redirect URIs. Set **Public URL** to a domain of this server; the Google and Microsoft callback paths are `/api/auth/callback/google` and `/api/auth/callback/microsoft` on that origin.
 3. **Inference is operator-selected, Codex is per user.** **Configure Local Inference** selects a verified local profile and never falls back to cloud inference. Without local configuration, a Vercel AI Gateway key selects explicit legacy mode. With neither configuration, inference stays disabled. A user who connects Codex and chooses a model gets the research chat on Codex in every mode. Builder and runner workflows remain available only in legacy mode.
 4. **The agent's sandbox is just-bash.** No Docker and no microsandbox exist inside the service, so eve's `defaultBackend()` falls through to the pure-JavaScript interpreter: a virtual filesystem with no real binaries and no network.
-5. **Pictures need Vercel Blob.** Without `BLOB_READ_WRITE_TOKEN` contacts keep no photograph and logos are hotlinked, as upstream documents.
+5. **Pictures live on the volume.** `CRM_MEDIA_DIR` is always set, so photographs and logos are copied to `media/` and need no Vercel Blob account. It takes precedence over `BLOB_READ_WRITE_TOKEN`; a token still entered in **Configure Research Agent** is not used for new pictures, and pictures already in Blob keep working. The files are public to anyone who knows the exact name, as Blob URLs are.
 6. **Telemetry is off by default** (`CRM_TELEMETRY_DISABLED=1`), the reverse of upstream. The toggle is in **Configure Research Agent**.
 7. **The scheduler replaces Vercel Cron.** `assets/scheduler.mjs` calls mailbox sync every five minutes and the rates, telemetry, retention and archive routes daily, each one minute after start.
 8. **OAuth tokens and third-party keys are stored in plaintext in Postgres**, as upstream, except Codex credentials, which are sealed under `CRM_SECRETS_KEY`. The volume is the boundary.
@@ -232,7 +235,7 @@ See [AGENTS.md](AGENTS.md).
 package_id: crm
 architectures: [x86_64, aarch64]
 volumes:
-  main: /var/lib/postgresql (postgresql/), /app/apps/agent/.eve/.workflow-data (agent/workflow-data/), /app/apps/agent/.eve/sandbox-cache (agent/sandbox-cache/)
+  main: /var/lib/postgresql (postgresql/), /app/apps/agent/.eve/.workflow-data (agent/workflow-data/), /app/apps/agent/.eve/sandbox-cache (agent/sandbox-cache/), /data/media (media/)
 ports:
   ui: 3000
   mcp: 3000 (/api/mcp)
@@ -262,6 +265,7 @@ startos_managed_env_vars:
   - PERPLEXITY_API_KEY
   - GITHUB_TOKEN
   - BLOB_READ_WRITE_TOKEN
+  - CRM_MEDIA_DIR
 actions:
   - set-admin-credentials
   - configure-sign-in

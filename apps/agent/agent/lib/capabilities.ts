@@ -1,6 +1,7 @@
 import "@crm/env/load";
 
 import { db } from "@crm/db";
+import { mirrorEnabled } from "@crm/db/blob";
 import { readContextDevKey } from "@crm/db/settings";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
@@ -68,6 +69,8 @@ export function capabilitiesFrom(
 		},
 		{
 			...fromEnv("BLOB_READ_WRITE_TOKEN"),
+			from: "CRM_MEDIA_DIR or BLOB_READ_WRITE_TOKEN",
+			enabled: mirrorEnabled(),
 			label: "Picture storage",
 			gives:
 				"somewhere to keep a logo or a profile photo. Without it a record has no picture at all, because the URLs these sources hand back expire and are never stored as they are",

@@ -29,17 +29,24 @@ See `docs/local-inference.md` for the complete mode and session contract.
 
 ## Pictures are copied, never linked
 
-`mirror()` copies bytes to Vercel Blob; the record points at our copy. Lives in
+`mirror()` copies bytes to Vercel Blob, or to `CRM_MEDIA_DIR` when that is set; the
+record points at our copy. Lives in
 **`@crm/db/blob`** — writers are `lib/brand-images.ts`, `lib/portrait.ts`,
 `FaviconService`, `ImageMirrorService`, `prisma/seed.ts`.
 
 - **The key hashes the bytes** — idempotent, and a redesigned mark gets a new URL.
 - **`COMPANY_IMAGE_FIELDS` (`@crm/db/images`) is the one list of picture columns.**
 - **Fetch through `@crm/db/safe-fetch`** — vendor URLs are SSRF vectors.
-- **No `BLOB_READ_WRITE_TOKEN` means no photographs**; logos keep the origin URL.
+- **No `BLOB_READ_WRITE_TOKEN` and no `CRM_MEDIA_DIR` means no photographs**; logos
+  keep the origin URL.
+- **`CRM_MEDIA_DIR` wins over Blob.** The file is `<prefix with / as ->-<digest>.<ext>`,
+  written to a temporary name and renamed, and the record stores the relative path
+  `/media/<name>`, so it survives a change of address. `apps/app/app/media/[name]/route.ts`
+  serves only names matching `MEDIA_NAME` (`@crm/db/images`). It needs no session: the
+  image optimizer fetches it without cookies, and a Blob URL is public too.
 - **`isOptimizable` (`@crm/db/images`) is the whole rule**: `next.config.ts`
-  allow-lists only our Blob host (a wildcard makes us an open image proxy), and a
-  mirrored **SVG is still refused**.
+  allow-lists only our Blob host (a wildcard makes us an open image proxy), our own
+  `/media/` path is local and needs no entry, and a mirrored **SVG is still refused**.
 - **Faces are not optimized** — `AvatarImage` skips `<Image>` because Radix probes the
   URL itself, doubling fetches.
 - **A photograph only comes from a source already tied to this person** —

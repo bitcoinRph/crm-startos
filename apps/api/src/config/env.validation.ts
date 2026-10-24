@@ -118,6 +118,10 @@ export class EnvironmentVariables {
 	BLOB_READ_WRITE_TOKEN?: string;
 
 	@IsOptional()
+	@IsString()
+	CRM_MEDIA_DIR?: string;
+
+	@IsOptional()
 	@IsUrl(
 		{ require_tld: false, require_protocol: true },
 		{
