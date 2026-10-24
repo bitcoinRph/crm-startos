@@ -94,8 +94,8 @@ install test on a real StartOS box, and a size cap on the directory.
 
 ## G. Container hardening
 
-The image runs as root (`Dockerfile`). Add `USER node` and give the mounted
-volume paths to that user in `main.ts`.
+Done: the image now ends with `USER node`, and `main.ts` runs every `crm` process
+as `node` after a root `crm-volume-owner` oneshot chowns the mounted volume paths.
 
 ## H. Dead-code gate
 

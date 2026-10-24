@@ -9,6 +9,10 @@ export const postgresPort = 5432
 export const appDir = '/app'
 export const assetsDir = '/assets'
 export const mediaDir = '/data/media'
+export const crmUser = 'node'
+export const workflowDataDir = `${appDir}/apps/agent/.eve/.workflow-data`
+export const sandboxCacheDir = `${appDir}/apps/agent/.eve/sandbox-cache`
+export const crmVolumePaths = [workflowDataDir, sandboxCacheDir, mediaDir]
 
 export const secretCharset = 'a-z,A-Z,0-9'
 export const hexCharset = 'a-f,0-9'

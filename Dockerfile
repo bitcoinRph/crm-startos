@@ -7,7 +7,9 @@ RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
+RUN chown node:node /app
+USER node
+COPY --chown=node:node . .
 
 ENV NODE_ENV=production \
     DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build \
@@ -21,13 +23,13 @@ ENV NODE_ENV=production \
 RUN bun install --frozen-lockfile \
     && bun run build \
     && rm -rf node_modules/.cache apps/app/.next/cache \
-    && echo "image-size before: $(du -shc /app /root/.bun/install/cache | tail -1 | cut -f1)" \
+    && echo "image-size before: $(du -shc /app /home/node/.bun/install/cache | tail -1 | cut -f1)" \
     && find . -type d \( \
          -path '*@next*swc-linux-*-musl*' -o \
          -path '*@biomejs*cli-linux-*' -o \
          -path '*@turbo*linux-*' \) \
        -prune -print -exec rm -rf {} + \
-    && rm -rf /root/.bun/install/cache \
+    && rm -rf /home/node/.bun/install/cache \
     && echo "image-size after: $(du -sh /app | cut -f1)"
 
 EXPOSE 3000 3001 2000

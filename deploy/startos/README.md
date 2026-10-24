@@ -68,17 +68,20 @@ make x86
 | `crm` | Built by the root `Dockerfile` from this repository: Node 24 with Bun, `bun install --frozen-lockfile`, `bun run build` | x86_64, aarch64 |
 | `postgres` | Official `postgres` image, 17 on Alpine | x86_64, aarch64 |
 
-Five daemons and two oneshots run from those two images, in this order:
+Five daemons and three oneshots run from those two images, in this order:
 
 | Name | Kind | Command | Purpose |
 | --- | --- | --- | --- |
 | `postgres` | daemon | image entrypoint, `listen_addresses=127.0.0.1` | The database, loopback only |
+| `crm-volume-owner` | oneshot (root) | `chown -R node:node` on the two mounted agent paths | Gives the unprivileged `node` user the volume paths, including files an older install wrote as root |
 | `migrate` | oneshot | `bunx prisma migrate deploy` in `packages/db` | Applies pending migrations on every start |
 | `local-account` | oneshot | `bun scripts/local-account.ts` in `apps/api` | Creates or resets the password account from the store |
 | `api` | daemon | `bun dist/main.js` in `apps/api`, port 3001 | NestJS API, tRPC, auth, MCP |
 | `app` | daemon | `bun run start` (`next start`, `PORT=3000`) in `apps/app` | The web app; proxies `/api/*` to the API on its own origin |
 | `agent` | daemon | `bun run start` (`eve start`, port 2000) in `apps/agent` | The eve research agent with its own schedule |
 | `scheduler` | daemon | `node /assets/scheduler.mjs` | Calls the API's `/internal/*` cron routes with `CRON_SECRET` |
+
+Every `crm` process runs as the image's unprivileged `node` user (uid 1000), and a root oneshot, `crm-volume-owner`, runs `chown -R node:node` on the two mounted agent paths before `migrate` so installs that wrote them as root keep working. `postgres` is unchanged.
 
 Only port 3000 is bound to an interface. The API and the agent are reachable on loopback inside the container only; the agent's `/eve/v1/*` routes accept any loopback request without a token, so the agent port must never be exposed.
 
