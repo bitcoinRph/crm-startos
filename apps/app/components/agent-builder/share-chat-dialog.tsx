@@ -2,6 +2,7 @@
 
 import Close from "@carbon/icons-react/es/Close";
 import Copy from "@carbon/icons-react/es/Copy";
+import { BRAND } from "@crm/env/brand";
 import {
 	AsyncButtonContent,
 	useAsyncAction,
@@ -173,7 +174,7 @@ export function ShareChatDialog({
 							/>
 							<ShareChoice
 								selected={shared === true}
-								label="Anyone in Comp AI with the link"
+								label={`Anyone in ${BRAND.company} with the link`}
 								detail="Read-only"
 								disabled={createAction.pending || revokeAction.pending}
 								onSelect={() => {

@@ -18,15 +18,20 @@ export const RESERVED_SLUGS: readonly string[] = [
 	"api",
 	"agent",
 	"agents",
+	"apple-icon",
 	"chat",
 	"companies",
 	"contacts",
 	"deals",
 	"eve",
 	"grant-access",
+	"icon",
+	"media",
 	"onboarding",
+	"rest",
 	"settings",
 	"sign-in",
+	"t",
 ];
 
 export function workspaceSlug(name: string): string {

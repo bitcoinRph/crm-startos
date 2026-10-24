@@ -262,10 +262,16 @@ describe("proxy", () => {
 		).toBeNull();
 	});
 
-	it("serves the app icons to strangers and to signed-in reps", async () => {
+	it("serves the app icons and the REST surface to strangers and to signed-in reps", async () => {
 		setup();
 
-		for (const path of ["/icon/32", "/icon/512", "/apple-icon"]) {
+		for (const path of [
+			"/icon/32",
+			"/icon/512",
+			"/apple-icon",
+			"/rest/deals/search",
+			"/openapi.json",
+		]) {
 			expect(redirectedTo(await proxy(request(path)))).toBeNull();
 			expect(
 				redirectedTo(await proxy(request(path, [SESSION_COOKIE]))),

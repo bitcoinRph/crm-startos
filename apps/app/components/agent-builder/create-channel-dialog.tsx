@@ -1,5 +1,7 @@
 "use client";
 
+import { BRAND } from "@crm/env/brand";
+
 import { Button } from "@crm/ui/components/button";
 import {
 	Dialog,
@@ -57,8 +59,8 @@ export function CreateChannelDialog({
 				<DialogHeader>
 					<DialogTitle>Create a channel</DialogTitle>
 					<DialogDescription>
-						Comp AI makes it in Slack and joins it. You can put the agent in it
-						straight after.
+						{BRAND.slackApp} makes it in Slack and joins it. You can put the
+						agent in it straight after.
 					</DialogDescription>
 				</DialogHeader>
 

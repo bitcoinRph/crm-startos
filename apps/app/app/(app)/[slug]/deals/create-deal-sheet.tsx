@@ -2,6 +2,7 @@
 
 import Add from "@carbon/icons-react/es/Add";
 import { CURRENCIES } from "@crm/db/currency";
+import { BRAND } from "@crm/env/brand";
 import { Button } from "@crm/ui/components/button";
 import { DatePicker } from "@crm/ui/components/date-picker";
 import {
@@ -147,7 +148,7 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 								id={nameId}
 								value={name}
 								onChange={(event) => setName(event.target.value)}
-								placeholder="Stripe — Comp AI"
+								placeholder={`Stripe — ${BRAND.company}`}
 								autoComplete="off"
 								required
 							/>

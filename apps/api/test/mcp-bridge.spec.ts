@@ -2128,8 +2128,10 @@ describe("MCP deterministic follow-ups", () => {
 				paths: z.record(z.string(), z.object({ get: z.object({}).optional() })),
 			})
 			.parse(await openapiResponse.json());
-		expect(spec.paths["/search/resolve-customer"]?.get).toBeDefined();
-		expect(spec.paths["/activities/follow-ups"]?.get).toBeDefined();
+		expect(spec.paths["/rest/search/resolve-customer"]?.get).toBeDefined();
+		expect(spec.paths["/rest/activities/follow-ups"]?.get).toBeDefined();
+		expect(spec.paths["/search/resolve-customer"]).toBeUndefined();
+		expect(spec.paths["/health"]?.get).toBeDefined();
 		expect(await ownedState()).toEqual(before);
 	});
 });

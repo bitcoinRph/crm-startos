@@ -3,7 +3,7 @@ import { long, ollamaDependency, short } from './i18n'
 
 export const manifest = setupManifest({
   id: 'crm',
-  title: 'CRM',
+  title: 'Freehold AI CRM',
   license: 'MIT',
   packageRepo: 'https://github.com/bitcoinRph/crm-startos',
   upstreamRepo: 'https://github.com/trycompai/crm',

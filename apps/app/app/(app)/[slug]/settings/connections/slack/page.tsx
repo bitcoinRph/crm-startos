@@ -8,6 +8,7 @@ import {
 	type SlackScope,
 	slackScopeDrift,
 } from "@crm/auth";
+import { BRAND } from "@crm/env/brand";
 import {
 	Alert,
 	AlertAction,
@@ -296,7 +297,7 @@ function MissingGrant({
 				<Icon icon={Warning} />
 				<AlertTitle>
 					{privateChannels
-						? "Comp AI cannot reach private channels"
+						? `${BRAND.slackApp} cannot reach private channels`
 						: `Slack held back ${missing.length} permission${missing.length === 1 ? "" : "s"}`}
 				</AlertTitle>
 				<AlertDescription>

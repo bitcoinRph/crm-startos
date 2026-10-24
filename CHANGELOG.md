@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/bitcoinRph/crm-startos/compare/v1.21.0...v1.22.0) (2026-10-24)
+
+
+### Features
+
+* Freehold AI CRM, REST API on StartOS, faster start (1.21.0:0) ([#51](https://github.com/bitcoinRph/crm-startos/issues/51)) ([534919b](https://github.com/bitcoinRph/crm-startos/commit/534919b773c144b5906b291528462a894e1d13d0))
+
 ## [1.21.0](https://github.com/bitcoinRph/crm-startos/compare/v1.20.1...v1.21.0) (2026-10-24)
 
 

@@ -2,6 +2,7 @@
 
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import Locked from "@carbon/icons-react/es/Locked";
+import { BRAND } from "@crm/env/brand";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { cn } from "@crm/ui/lib/utils";
@@ -125,11 +126,12 @@ function describe(channel: PickerChannel, canInviteItself: boolean): string {
 	const people =
 		channel.memberCount === null ? "" : ` · ${channel.memberCount} people`;
 
-	if (channel.isMember) return `Comp AI is in${people}`;
+	if (channel.isMember) return `${BRAND.slackApp} is in${people}`;
 	if (!channel.classified) return `Not read from Slack yet${people}`;
-	if (!channel.isPrivate) return `Comp AI can join this one${people}`;
-	if (canInviteItself) return `Private. Comp AI joins as you${people}`;
+	if (!channel.isPrivate) return `${BRAND.slackApp} can join this one${people}`;
+	if (canInviteItself)
+		return `Private. ${BRAND.slackApp} joins as you${people}`;
 	if (channel.inviteRequestedAt)
 		return `Private. Waiting on an invite${people}`;
-	return `Private. Someone inside has to invite Comp AI${people}`;
+	return `Private. Someone inside has to invite ${BRAND.slackApp}${people}`;
 }

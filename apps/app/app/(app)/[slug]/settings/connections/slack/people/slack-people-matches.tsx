@@ -1,5 +1,7 @@
 "use client";
 
+import { BRAND } from "@crm/env/brand";
+
 import { Button } from "@crm/ui/components/button";
 import { Spinner } from "@crm/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -64,8 +66,8 @@ export function SlackPeopleMatches({
 			</div>
 			{matches.data.sync === "stalled" ? (
 				<p className="text-center text-warning text-xs">
-					Comp AI is not reading Slack right now. These matches can be out of
-					date.
+					{BRAND.slackApp} is not reading Slack right now. These matches can be
+					out of date.
 				</p>
 			) : null}
 			<div className="flex flex-col divide-y border-y">
