@@ -20,6 +20,8 @@ import {
 import { TableCell } from "@crm/ui/components/table";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { RecordChanges } from "@/components/crm/record-changes";
+import { SECTION_TITLE } from "@/components/detail-sheet";
 import { LocalRelativeTime } from "@/components/local-date-time";
 import { useTRPC } from "@/lib/trpc/client";
 
@@ -64,7 +66,7 @@ export function ApiKeyCallsSheet({
 					<SheetTitle>Recent calls</SheetTitle>
 					<SheetDescription>
 						The last 50 calls made with {label}, newest first. Arguments are
-						never stored.
+						never stored. This sheet also lists the record changes {label} made.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -113,6 +115,11 @@ export function ApiKeyCallsSheet({
 							</SimpleTableRow>
 						)}
 					</SimpleTable>
+
+					<section className="flex flex-col gap-2 pt-6 pb-4">
+						<h3 className={SECTION_TITLE}>Record changes</h3>
+						<RecordChanges filter={{ apiKeyId: id }} />
+					</section>
 				</div>
 			</SheetContent>
 		</Sheet>
