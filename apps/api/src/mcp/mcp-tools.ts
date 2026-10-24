@@ -67,7 +67,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
 		name: "dashboard_summary",
 		procedure: "dashboard.summary",
 		description:
-			"Pipeline totals, open deals by stage and recent activity, for the caller or for everyone.",
+			"Pipeline totals, the weighted forecast, open deals by stage and recent activity, for the caller or for everyone.",
 	},
 	{
 		name: "list_contacts",

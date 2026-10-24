@@ -42,6 +42,12 @@ const stageBucketOutput = z.object({
 	valueCents: z.number(),
 });
 
+const forecastStageOutput = z.object({
+	stage: stageEnum,
+	probability: z.number(),
+	weightedCents: z.number(),
+});
+
 const trendPointOutput = z.object({
 	month: z.string(),
 	won: z.number(),
@@ -94,6 +100,11 @@ export const dashboardSummaryOutput = z.object({
 		stages: z.array(stageBucketOutput),
 		totalCents: z.number(),
 		totalDeals: z.number(),
+	}),
+	forecast: z.object({
+		stages: z.array(forecastStageOutput),
+		totalCents: z.number(),
+		closingThisMonthCents: z.number(),
 	}),
 	wonThisMonth: monthlyTotalOutput,
 	wonPrevMonth: monthlyTotalOutput,

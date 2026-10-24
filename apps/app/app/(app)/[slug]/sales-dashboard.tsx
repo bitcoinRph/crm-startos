@@ -48,6 +48,7 @@ export function SalesDashboard({ summary }: { summary: Summary }) {
 
 	const {
 		pipeline,
+		forecast,
 		wonThisMonth,
 		wonPrevMonth,
 		performance,
@@ -93,7 +94,7 @@ export function SalesDashboard({ summary }: { summary: Summary }) {
 				<StatCard
 					label="Open pipeline"
 					value={money(pipeline.totalCents)}
-					description={`${formatCount(pipeline.totalDeals, "deal")} in progress · ${money(closingThisMonthTotal.valueCents)} due this month`}
+					description={`${formatCount(pipeline.totalDeals, "deal")} in progress · ${money(forecast.totalCents)} weighted · ${money(closingThisMonthTotal.valueCents)} due this month`}
 				/>
 				<StatCard
 					label={`Win rate (${performance.windowDays}d)`}
